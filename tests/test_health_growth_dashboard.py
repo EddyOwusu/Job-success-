@@ -126,7 +126,7 @@ def test_dashboard_builds_and_escapes(tmp_path, monkeypatch, profile, cv, settin
     data = dashboard.collect(db, ctx)
     assert data["counts"]["shortlisted"] == 1 and data["shortlist"][0]["matched"] == ["Python"]
     page = dashboard.render(data)
-    assert page.startswith("<!doctype html>") and 'id="wordmark"' in page and data["title"] == "Job Agent"
+    assert page.startswith("<!doctype html>") and 'id="brand"' in page and data["title"] == "Job Agent"
     assert "</script><script>alert(1)" not in page            # job text can't break out of the data block
     assert json.loads(page.split('id="data">')[1].split("</script>")[0].replace("<\\/", "</"))["shortlist"][0]["title"] == "Backend Engineer"
     frag = dashboard.render(data, standalone=False)

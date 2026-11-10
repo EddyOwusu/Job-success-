@@ -279,16 +279,16 @@ This is a pointer to the right gov.uk pages, not immigration advice.
 
 **Dashboard (`jobagent dashboard`).** Rebuilt as `output/dashboard.html` after every run:
 a single file that opens without internet (it falls back to system fonts when offline).
-It is designed as a travel document. The cover is passport navy with gold lettering, a
-block of fields like a visa sticker, and a machine-readable strip that encodes today's
-numbers. A seal is drawn from your own counts, so its shape changes as you progress. Your
-pipeline is a route with stations ending at "Visa". Every application is an ink stamp:
-a rectangle for applied, an oval for an interview, a solid gold disc for an offer and a
-struck red frame for a no, so status never depends on colour alone. Set the name on the
-cover with `dashboard.title` in `config/settings.yaml`. It shows what to do today (with the command for
-each action; tap to copy), suggestions, the shortlist with sector filters and search, your
-pipeline, what was filtered out and why, applications and their status, interview rates,
-skill gaps, source health, visa routes and the sponsor radar. `--open` opens it; `--serve`
+It is a restrained product UI in the manner of modern fintech dashboards: the
+platform's own typeface (San Francisco on Apple devices, Inter elsewhere), neutral surfaces
+with hairline borders, and colour reserved for status badges. A sidebar switches between
+five views: **Overview** (metrics, today's actions, the pipeline with conversion rates, notes
+from the agent), **Shortlist** (a table you can filter by sector, search, and sort by score,
+salary or date), **Applications** (status, date and next step for each), **Insights**
+(interview rates, skill gaps, what was filtered out) and **System** (source health, visa
+routes, sponsorship facts). On a phone the sidebar becomes scrolling tabs and tables become
+cards. Set the product name with `dashboard.title` in `config/settings.yaml`.
+`--open` opens it; `--serve`
 serves a live copy at `http://127.0.0.1:8765`; `--lan` also makes it reachable from your
 phone on the same Wi-Fi, behind a random address printed when it starts. The page is
 read-only: nothing on it can change or submit anything.
