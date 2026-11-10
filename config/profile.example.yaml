@@ -84,6 +84,8 @@ languages: [English (fluent)]
 # a wrong answer to a right-to-work question can cost you the offer later.
 visa:
   needs_sponsorship: true
+  # Can you legally work in the UK today? (true on e.g. a Graduate or dependant visa)
+  current_uk_right_to_work: false
   target_route: Skilled Worker    # UK Skilled Worker visa
   current_status: "Outside the UK, no current UK visa"   # e.g. "Graduate visa valid until 2027-06"
   nationality: ""                 # only filled in on forms that require it

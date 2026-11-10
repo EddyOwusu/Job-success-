@@ -18,7 +18,6 @@ _NOT_UK = re.compile(
     re.I,
 )
 _UK_RE = re.compile(UK_PLACES, re.I)
-_NON_UK_REMOTE = re.compile(r"remote.{0,25}(us|usa|united states|canada|americas|india|apac|latam|germany|spain|france|poland|portugal|netherlands)", re.I)
 
 
 def is_uk(location: str, country_code: Optional[str] = None) -> bool:
@@ -28,11 +27,8 @@ def is_uk(location: str, country_code: Optional[str] = None) -> bool:
     for piece in re.split(r"[;|/]| or |\band\b", loc):
         if _UK_RE.search(piece) and not _NOT_UK.search(piece):
             return True
-    # "Remote - EMEA/Europe" adverts often accept UK-based people
-    if _UK_RE.search(loc) and not _NOT_UK.search(loc):
-        return True
-    if re.search(r"remote", loc, re.I) and re.search(r"emea|europe", loc, re.I) and not _NON_UK_REMOTE.search(loc):
-        return True
+    # "Remote - Europe/EMEA" without the UK named is usually hired via an employer-of-record abroad,
+    # which doesn't come with a UK visa, so it doesn't count.
     return False
 
 

@@ -39,9 +39,15 @@ KNOWN_FIELDS: list[tuple[str, str]] = [
 ]
 
 
+def clean_label(label: str) -> str:
+    label = re.sub(r"[✱*]+|\(required\)|\brequired\b", " ", label or "", flags=re.I)
+    return re.sub(r"\s+", " ", label).strip()
+
+
 def classify(label: str) -> Optional[str]:
+    label = clean_label(label)
     for pat, key in KNOWN_FIELDS:
-        if re.search(pat, label or "", re.I):
+        if re.search(pat, label, re.I):
             return key
     return None
 
@@ -56,7 +62,7 @@ def value_for(key: str, ctx: Context) -> Optional[str]:
         "current_company": current.company if current and current.end.lower() == "present" else "",
         "current_title": current.title if current and current.end.lower() == "present" else "",
         "needs_sponsorship": "Yes" if v.needs_sponsorship else "No",
-        "right_to_work": "No" if v.needs_sponsorship else "Yes",
+        "right_to_work": "Yes" if (v.current_uk_right_to_work or not v.needs_sponsorship) else "No",
         "willing_to_relocate": "Yes" if v.willing_to_relocate else "No",
         "nationality": v.nationality, "visa_status": v.current_status,
     }

@@ -9,6 +9,7 @@ It never solves CAPTCHAs; if one appears you finish that application yourself.
 """
 from __future__ import annotations
 
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -46,18 +47,27 @@ COLLECT_JS = r"""
     const type = (el.getAttribute('type') || el.tagName).toLowerCase();
     if (['hidden', 'submit', 'button', 'reset', 'image', 'search'].includes(type)) continue;
     if (type !== 'file' && !visible(el)) continue;
+    if (type !== 'file' && (el.tabIndex === -1 || el.getAttribute('aria-hidden') === 'true')) continue;
     if (el.tagName === 'INPUT' && el.getAttribute('role') === 'combobox' && el.closest('[data-ja]')) continue;
     el.setAttribute('data-ja', String(i));
     const required = el.required || el.getAttribute('aria-required') === 'true' || /\*\s*$/.test(labelFor(el));
     if (type === 'radio' || type === 'checkbox') {
-      const container = el.closest('fieldset, [role="radiogroup"], [role="group"], .application-question, div[class*="question"], div[class*="field"]');
-      const gkey = (el.name || '') + '|' + (container ? (container.getAttribute('data-ja-g') || (container.setAttribute('data-ja-g', String(i)), String(i))) : String(i));
       const optLabel = labelFor(el);
-      let qLabel = '';
-      if (container) {
-        const l = container.querySelector('legend, label:not(:has(input)), .application-label, [class*="label"]');
-        qLabel = l ? txt(l) : txt(container).slice(0, 200);
+      // find the question text: nearest ancestor holding a label-like element that is not an option label
+      let qLabel = '', qNode = null, node = el.parentElement;
+      const isOptionLabel = l => {
+        if (l.querySelector('input')) return true;
+        const f = l.getAttribute('for');
+        if (f) { const t = document.getElementById(f); if (t && ['radio', 'checkbox'].includes(t.type)) return true; }
+        return false;
+      };
+      for (let k = 0; k < 7 && node && !qLabel; k++, node = node.parentElement) {
+        for (const l of node.querySelectorAll('legend, .application-label, label, [class*="label"], [class*="Label"], [class*="title"], h3, h4')) {
+          if (!l.contains(el) && !isOptionLabel(l) && txt(l) && txt(l) !== optLabel) { qLabel = txt(l); qNode = node; break; }
+        }
       }
+      if (qNode && !qNode.hasAttribute('data-ja-g')) qNode.setAttribute('data-ja-g', String(i));
+      const gkey = (el.name || '') + '|' + (qNode ? qNode.getAttribute('data-ja-g') : String(i));
       if (!groups[gkey]) { groups[gkey] = {idx: String(i), kind: type, label: qLabel || optLabel, required, options: [], option_idx: []}; out.push(groups[gkey]); }
       groups[gkey].options.push(optLabel);
       groups[gkey].option_idx.push(String(i));
@@ -112,8 +122,11 @@ def fill_form(url: str, ctx, pack, answer_fn: Callable[[list[dict]], dict[str, t
     with sync_playwright() as pw:
         # dry: fill in a hidden browser and screenshot, never submit (for testing)
         launch = {"headless": (headless and mode == "auto") or mode == "dry"}
+        chromium_path = chromium_path or os.environ.get("JOBAGENT_CHROMIUM_PATH", "")
         if chromium_path:
             launch["executable_path"] = chromium_path
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            launch["args"] = ["--no-sandbox"]  # Chromium refuses to start as root otherwise (containers)
         browser = pw.chromium.launch(**launch)
         page = browser.new_page(viewport={"width": 1280, "height": 1600})
         page.goto(url, wait_until="domcontentloaded", timeout=60000)

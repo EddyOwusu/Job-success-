@@ -55,6 +55,7 @@ class Education(BaseModel):
 
 class Visa(BaseModel):
     needs_sponsorship: bool = True
+    current_uk_right_to_work: bool = False   # e.g. True while on a Graduate visa
     target_route: str = "Skilled Worker"
     current_status: str = ""
     nationality: str = ""

@@ -41,8 +41,6 @@ def slug_candidates(name: str) -> list[str]:
     for t in (core, toks):
         if t:
             cands += ["".join(t), "-".join(t)]
-    if core and len(core[0]) >= 6:
-        cands.append(core[0])
     seen, out = set(), []
     for c in cands:
         c = re.sub(r"[^a-z0-9-]", "", c)
@@ -54,16 +52,36 @@ def slug_candidates(name: str) -> list[str]:
 
 def _greenhouse_name_ok(token: str, sponsor_name: str) -> bool:
     meta = get_json(f"https://boards-api.greenhouse.io/v1/boards/{token}", min_interval=0.2) or {}
-    board = core_name(meta.get("name", ""))
-    want = core_name(sponsor_name)
-    return bool(board) and (board == want or board.split()[0] == want.split()[0])
+    board = core_name(meta.get("name", "")).replace(" ", "")
+    want = core_name(sponsor_name).replace(" ", "")
+    return bool(board) and board == want
 
 
-def _uk_jobs(ats: str, token: str) -> int:
+COMMON_WORDS = {
+    "build", "quantum", "sample", "impact", "simple", "smart", "bright", "nova", "apex", "pulse", "prime", "core",
+    "next", "open", "true", "blue", "green", "red", "one", "first", "global", "insight", "vision", "spark", "edge",
+    "nexus", "zen", "flow", "wave", "shift", "point", "path", "bridge", "link", "hub", "base", "stack", "pixel",
+    "atlas", "orbit", "fusion", "matrix", "vertex", "summit", "peak", "unity", "bloom", "ember", "echo", "lumen",
+}
+
+
+def _uk_jobs(ats: str, token: str, sponsor_name: str) -> int:
+    """UK jobs on the board, or 0 if the adverts don't mention the company (slug belongs to someone else)."""
     try:
-        return len(ATS[ats].fetch(token, uk_only=True)) if ats != "smartrecruiters" else 0
+        jobs = ATS[ats].fetch(token, uk_only=True) if ats != "smartrecruiters" else []
     except Exception:
         return 0
+    if not jobs:
+        return 0
+    phrase = " ".join(_tokens(sponsor_name))
+    core = core_name(sponsor_name)
+    text = " ".join((j.description or "") + " " + j.title for j in jobs[:10]).lower()
+    squashed = re.sub(r"[^a-z0-9]", "", text)
+    if phrase and (phrase in text or phrase.replace(" ", "") in squashed):
+        return len(jobs)
+    if core and core not in COMMON_WORDS and len(core.replace(" ", "")) >= 5 and core in text:
+        return len(jobs)
+    return 0
 
 
 def probe_company(name: str) -> list[tuple[str, str, int]]:
@@ -78,7 +96,7 @@ def probe_company(name: str) -> list[tuple[str, str, int]]:
             if count and count > 0:
                 if ats == "greenhouse" and not _greenhouse_name_ok(slug, name):
                     continue
-                uk = _uk_jobs(ats, slug)
+                uk = _uk_jobs(ats, slug, name)
                 if uk:
                     found.append((ats, slug, uk))
         if found:
@@ -86,12 +104,39 @@ def probe_company(name: str) -> list[tuple[str, str, int]]:
     return found
 
 
+TECH_HUBS = re.compile(r"london|cambridge|oxford|manchester|edinburgh|bristol|leeds|glasgow|belfast|reading|"
+                       r"brighton|bath|guildford|milton keynes|newcastle|sheffield|birmingham|cardiff", re.I)
+STRONG = re.compile(r"\b(technolog(y|ies)|software|labs?|ai|robotics|analytics|cloud|cyber|fintech|platforms?|"
+                    r"data|digital|quantum|bio|health|games|studios?|io|app|apps|computing|intelligence)\b", re.I)
+WEAK = re.compile(r"consult|recruit|staffing|resourc|outsourc|care\b|trading|import|export|catering|"
+                  r"restaurant|construction|logistics|cleaning|security services|it services|it solutions", re.I)
+
+
+def priority(sp) -> float:
+    """How promising a sponsor is for tech job boards (higher = probe first)."""
+    score = 0.0
+    if TECH_HUBS.search(sp.town or ""):
+        score += 2
+    score += 1.5 * len(STRONG.findall(sp.name))
+    if WEAK.search(sp.name):
+        score -= 3
+    core = core_name(sp.name).split()
+    if 1 <= len(core) <= 2:
+        score += 1      # short brandable names are usually product companies
+    if not sp.a_rated:
+        score -= 2
+    return score
+
+
 def discover(db: DB, register: SponsorRegister, keywords: list[str], max_probes: int = 400,
              extra_names: list[str] | None = None, workers: int = 8, progress=None) -> list[tuple[str, str, str, int]]:
     """Probe up to `max_probes` not-yet-checked sponsors. Returns new boards found."""
+    # dream companies and employers already seen in job adverts first, then the most promising sponsors
     names = list(extra_names or [])
-    for sp in register.tech_like(keywords):
-        names.append(sp.name)
+    seen_employers = [r[0] for r in db.conn.execute(
+        "SELECT DISTINCT sponsor_match FROM jobs WHERE sponsor_match IS NOT NULL AND source IN ('reed','adzuna')")]
+    names += seen_employers
+    names += [sp.name for sp in sorted(register.tech_like(keywords), key=priority, reverse=True)]
     todo, seen = [], set()
     for n in names:
         key = core_name(n)
@@ -112,6 +157,9 @@ def discover(db: DB, register: SponsorRegister, keywords: list[str], max_probes:
                 hits = []
             display = re.sub(r"\b(ltd|limited|plc|llp)\b\.?", "", name, flags=re.I).strip(" ,.")
             for ats, token, n in hits:
+                taken = db.conn.execute("SELECT company FROM boards WHERE ats=? AND token=?", (ats, token)).fetchone()
+                if taken and core_name(taken[0]) != core_name(display):
+                    continue  # the slug already belongs to another company: ambiguous, skip
                 db.upsert_board(ats, token, display, name, "live", n)
                 found.append((display, ats, token, n))
             db.mark_probed(name, ",".join(f"{a}:{t}" for a, t, _ in hits))

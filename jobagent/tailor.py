@@ -17,7 +17,10 @@ WRITER = "an expert UK tech CV writer who knows how applicant tracking systems p
 
 # ---------------------------------------------------------------------------- truth guard
 def _source_text(profile: Profile, cv: MasterCV) -> str:
-    return json.dumps(profile.model_dump()) + json.dumps(cv.model_dump())
+    """Only career facts (not settings like word limits or salary wishes, whose numbers would leak in)."""
+    facts = profile.model_dump(include={"skills", "education", "certifications", "languages"})
+    facts["years_experience"] = profile.targets.years_experience
+    return json.dumps(facts) + json.dumps(cv.model_dump())
 
 
 def _numbers(text: str) -> set[str]:
