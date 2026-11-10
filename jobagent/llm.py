@@ -72,6 +72,54 @@ class LLM:
             raise LLMError("Claude returned no structured output")
         return parsed
 
+    def research(self, prompt: str, *, max_searches: int = 8, effort: str = "medium",
+                 max_continuations: int = 4) -> tuple[str, list[tuple[str, str]]]:
+        """Free-text research with Claude's web search. Returns (notes, [(title, url)]).
+
+        Only send what is needed to search (company, role, advert): never the candidate's details.
+        Web search must be allowed for your organisation in the Claude Console.
+        """
+        a = self.anthropic
+        tools = [{"type": "web_search_20260209", "name": "web_search", "max_uses": max_searches,
+                  "user_location": {"type": "approximate", "country": "GB"}}]
+        messages = [{"role": "user", "content": prompt}]
+        assistant_blocks: list = []
+        text_parts: list[str] = []
+        sources: dict[str, str] = {}
+        try:
+            for _ in range(max_continuations + 1):
+                resp = self.client.beta.messages.create(
+                    model=self.model, max_tokens=16000, messages=messages, tools=tools,
+                    thinking={"type": "adaptive"}, output_config={"effort": effort},
+                    betas=[FALLBACK_BETA], fallbacks="default",
+                )
+                if resp.usage:
+                    self.input_tokens += resp.usage.input_tokens or 0
+                    self.output_tokens += resp.usage.output_tokens or 0
+                for block in resp.content:
+                    if block.type == "text":
+                        text_parts.append(block.text)
+                        for c in getattr(block, "citations", None) or []:
+                            url = getattr(c, "url", None)
+                            if url:
+                                sources.setdefault(url, getattr(c, "title", None) or url)
+                if resp.stop_reason == "pause_turn":   # the server's search loop paused: let it continue
+                    assistant_blocks += list(resp.content)
+                    messages = [{"role": "user", "content": prompt},
+                                {"role": "assistant", "content": assistant_blocks}]
+                    continue
+                if resp.stop_reason == "refusal":
+                    raise LLMError("Claude declined the research request")
+                break
+        except a.BadRequestError as e:
+            raise LLMError(f"Web research failed ({e.message}). Is web search enabled for your organisation "
+                           f"in the Claude Console?") from e
+        except a.APIStatusError as e:
+            raise LLMError(f"Claude API error {e.status_code}: {e.message}") from e
+        except a.APIConnectionError as e:
+            raise LLMError("Could not reach the Claude API (network problem)") from e
+        return "".join(text_parts).strip(), [(t, u) for u, t in sources.items()]
+
     def usage_summary(self) -> str:
         return f"{self.input_tokens:,} input / {self.output_tokens:,} output tokens"
 

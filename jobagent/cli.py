@@ -262,10 +262,92 @@ def cmd_status(a):
     if not r:
         print("No such job.")
         return 1
-    db.set_status(r["uid"], a.status)
-    db.conn.execute("UPDATE applications SET status=? WHERE job_uid=?", (a.status, r["uid"]))
-    db.commit()
+    db.set_status(r["uid"], a.status, source="you")
     print(f"{r['company']} / {r['title']} -> {a.status}")
+    if a.status == "interview":
+        from .interview import build_prep
+        print("Building your interview prep pack...")
+        path, msgs = build_prep(_llm(ctx), ctx, db, db.row_to_job(r), r["sponsor_match"])
+        for m in msgs:
+            print(f"  {m}")
+        print(f"Open: {path}")
+
+
+def cmd_prep(a):
+    ctx, db = _ctx_db()
+    from .interview import build_prep, summary_line
+
+    r = db.get_job(a.id)
+    if not r:
+        print("No such job.")
+        return 1
+    path, msgs = build_prep(_llm(ctx), ctx, db, db.row_to_job(r), r["sponsor_match"],
+                            stage=a.stage, interviewers=a.interviewers or "", notes=a.notes or "")
+    for m in msgs:
+        print(f"  {m}")
+    print(f"Interview prep ({summary_line(path)}): {path}")
+
+
+def cmd_radar(a):
+    ctx, db = _ctx_db()
+    from . import radar
+    from .config import OUTPUT_DIR
+    from .pipeline import load_register
+
+    reg = load_register(ctx, force=a.update)
+    rep = radar.update(db, reg)
+    if not rep.first_run and not a.no_probe:
+        def progress(i, total, name, hits):
+            if hits:
+                print(f"  [{i}/{total}] FOUND {name}: " + ", ".join(f"{x}/{t} ({c} UK jobs)" for x, t, c in hits))
+        scan = radar.scan(db, reg, ctx.settings["discovery"]["name_keywords"], days=a.days,
+                          max_probes=ctx.settings["radar"]["max_probes_per_run"], progress=progress)
+        rep.boards_found = scan.boards_found
+    md = radar.report_markdown(db, rep, a.days)
+    path = OUTPUT_DIR / "radar" / f"radar-{__import__('datetime').date.today():%Y-%m-%d}.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(md, encoding="utf-8")
+    print(md[:3000] + ("\n..." if len(md) > 3000 else ""))
+    print(f"(full list saved to {path})")
+
+
+def cmd_inbox(a):
+    ctx, db = _ctx_db()
+    from . import inbox
+    from .interview import build_prep
+
+    if not inbox.configured():
+        print("Set IMAP_USER and IMAP_PASSWORD (or SMTP_USER / SMTP_PASSWORD) in .env. For Gmail, use an App Password "
+              "and turn on IMAP in Gmail settings.")
+        return 1
+    llm = _llm(ctx)
+
+    def on_interview(uid):
+        row = db.get_job(uid)
+        path, _ = build_prep(llm, ctx, db, db.row_to_job(row), row["sponsor_match"])
+        print(f"  Interview prep written: {path}")
+
+    updates = inbox.sync(db, ctx, llm, days=a.days or ctx.settings["inbox"]["days"], on_interview=on_interview)
+    if not updates:
+        print("No new replies about your applications.")
+    for u in updates:
+        change = " (status updated)" if u.applied else ""
+        print(f"- {u.company} / {u.title}: {u.verdict}{change}  <- \"{u.subject[:80]}\"")
+
+
+def cmd_learn(a):
+    ctx, db = _ctx_db()
+    from . import learn
+    from .config import OUTPUT_DIR
+
+    rep = learn.report(db)
+    weights, notes = learn.learn_weights(db, save=ctx.settings["scoring"].get("adaptive", True))
+    md = learn.report_markdown(rep, notes)
+    path = OUTPUT_DIR / "reports" / "whats-working.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(md, encoding="utf-8")
+    print(md)
+    print(f"(saved to {path})")
 
 
 def cmd_network(a):
@@ -371,6 +453,21 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("id")
     s.add_argument("status", choices=STATUSES)
     s.set_defaults(fn=cmd_status)
+    s = sub.add_parser("prep", help="interview prep pack for a job (also built automatically on 'status <id> interview')")
+    s.add_argument("id")
+    s.add_argument("--stage", default="first interview", help="e.g. 'recruiter screen', 'technical', 'final panel'")
+    s.add_argument("--interviewers", help="names and roles, if you know them")
+    s.add_argument("--notes", help="anything they told you about the interview")
+    s.set_defaults(fn=cmd_prep)
+    s = sub.add_parser("radar", help="newly licensed visa sponsors, and their job boards")
+    s.add_argument("--days", type=int, default=14)
+    s.add_argument("--update", action="store_true", help="download today's register first")
+    s.add_argument("--no-probe", action="store_true", help="don't check new sponsors for job boards")
+    s.set_defaults(fn=cmd_radar)
+    s = sub.add_parser("inbox", help="read replies to your applications and update statuses")
+    s.add_argument("--days", type=int)
+    s.set_defaults(fn=cmd_inbox)
+    sub.add_parser("learn", help="what's working: interview rates by sector, source, score... and tuned scoring").set_defaults(fn=cmd_learn)
     s = sub.add_parser("network", help="who to contact and what to say for a job")
     s.add_argument("id")
     s.set_defaults(fn=cmd_network)

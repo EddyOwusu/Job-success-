@@ -111,11 +111,13 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
 def score_all(db: DB, ctx: Context, register: SponsorRegister, only_new: bool = False) -> int:
     rows = db.jobs("status='new'" if only_new else "status IN ('new','shortlisted')", limit=20000)
     thr = ctx.settings["scoring"]["shortlist_threshold"]
+    from .learn import current_weights
+    weights = current_weights(db, ctx.settings)
     n = 0
     for r in rows:
         job = db.row_to_job(r)
         sp = register.match(job.company)
-        b = score_job(job, ctx.profile, ctx.settings, sp)
+        b = score_job(job, ctx.profile, ctx.settings, sp, weights)
         db.set_score(job.uid, b.total, b.model_dump_json())
         db.conn.execute("UPDATE jobs SET sponsor_match=? WHERE uid=?", (sp.name if sp else None, job.uid))
         if b.blockers:
@@ -159,7 +161,32 @@ def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = 
 
 def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str] = None,
               max_apply: Optional[int] = None, say: Callable[[str], None] = print) -> RunStats:
+    from . import inbox, interview, learn, radar
+    from .insights import Insight
+
+    extra_insights: list[Insight] = []
     register = load_register(ctx)
+
+    # 1) sponsor radar: new licences since the last register, and their job boards
+    rad = radar.update(db, register)
+    if rad.first_run:
+        say("Sponsor radar: baseline saved. New licences will show up from the next register update.")
+    else:
+        scan = radar.scan(db, register, ctx.settings["discovery"]["name_keywords"], days=14,
+                          max_probes=ctx.settings["radar"]["max_probes_per_run"])
+        new_today = len(rad.new)
+        say(f"Sponsor radar: {new_today} new sponsors since the last register, "
+            f"{len(scan.boards_found)} new job boards found.")
+        if scan.boards_found:
+            extra_insights.append(Insight(2, f"{len(scan.boards_found)} newly licensed sponsors have job boards",
+                                          ", ".join(f"{c} ({n} UK jobs)" for c, _, _, n in scan.boards_found[:6])
+                                          + ". They're now in your daily search. New sponsors are often keen to hire."))
+        for w in rad.pipeline_warnings:
+            extra_insights.append(Insight(1, "Sponsor licence change", w))
+
+    # 2) learn from results so far, then search and score
+    if ctx.settings["scoring"].get("adaptive", True):
+        learn.learn_weights(db)
     st = collect(db, ctx, register, say)
     st.shortlisted = score_all(db, ctx, register)
     say(f"{st.shortlisted} jobs on the shortlist.")
@@ -185,7 +212,28 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
             except Exception as e:
                 st.errors.append(f"apply failed for {r['company']}: {e}")
 
-    ins = insights.compute(db, ctx)
+    # 3) replies in your inbox: rejections, interview invitations (which get a prep pack)
+    if inbox.configured():
+        def on_interview(uid):
+            row = db.get_job(uid)
+            if row:
+                path, _ = interview.build_prep(llm, ctx, db, db.row_to_job(row), row["sponsor_match"])
+                notify.push(f"Interview: {row['company']}", f"{row['title']}\nPrep pack ready: {path}")
+        try:
+            for u in inbox.sync(db, ctx, llm, on_interview=on_interview):
+                if u.verdict == "offer":
+                    extra_insights.append(Insight(1, f"Possible offer from {u.company}",
+                                                  f"Email: \"{u.subject}\". Check it, then run `jobagent status <id> offer`."))
+                elif u.verdict == "interview":
+                    extra_insights.append(Insight(1, f"Interview invitation: {u.company}",
+                                                  f"{u.title}. Your prep pack is in the application folder (interview-prep.md)."))
+                elif u.verdict == "rejected" and u.applied:
+                    st.errors.append(f"Inbox: {u.company} ({u.title}) said no. Marked rejected.")
+        except Exception as e:
+            st.errors.append(f"Inbox check failed: {e}")
+
+    ins = extra_insights + insights.compute(db, ctx)
+    ins.sort(key=lambda i: i.priority)
     notes = st.errors[:10]
     if llm:
         notes.append(f"Claude usage this run: {llm.usage_summary()}")

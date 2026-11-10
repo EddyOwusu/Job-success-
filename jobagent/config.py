@@ -61,6 +61,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "scoring": {
         "shortlist_threshold": 60,    # keyword score needed to be considered
         "apply_threshold": 70,        # Claude fit score needed to prepare an application
+        # Tune the score weights from your own results (needs 20+ applications with a result)
+        "adaptive": True,
     },
     "sponsorship": {
         # Only keep jobs at employers on the Home Office sponsor register
@@ -96,6 +98,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "max_per_company_per_30_days": 2,
         "headless": False,
         "chromium_path": "",          # leave blank to use Playwright's own browser
+    },
+    "radar": {
+        "max_probes_per_run": 40,     # newly licensed sponsors to check for job boards each run
+    },
+    "inbox": {
+        "days": 30,                   # how far back to read for replies
     },
     "followup": {
         "days": [4, 10, 18],          # follow-up reminders after applying

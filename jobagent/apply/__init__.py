@@ -166,7 +166,11 @@ def prepare_and_apply(db: DB, ctx: Context, llm: Optional[LLM], uid: str, mode: 
             msgs.append(f"Browser filling failed ({e}). Apply by hand with the pack: {url}")
 
     if submitted:
-        db.record_application(row, method, str(pack.dir))
+        from ..learn import snapshot
+        fresh = db.get_job(job.uid)
+        db.record_application(row, method, str(pack.dir),
+                              features=snapshot(fresh, method=method, claude=llm is not None,
+                                                statement=statement is not None))
         schedule_followups(db, ctx, job.uid, plan.outreach if plan else None)
         msgs.append("Recorded as applied. Follow-ups scheduled.")
     db.commit()
@@ -187,7 +191,8 @@ def mark_applied(db: DB, ctx: Context, uid: str, notes: str = "") -> None:
     row = db.get_job(uid)
     if not row:
         raise ValueError(f"No job matching '{uid}'")
-    db.record_application(row, "manual", "", notes)
+    from ..learn import snapshot
+    db.record_application(row, "manual", "", notes, features=snapshot(row, method="manual", claude=False))
     schedule_followups(db, ctx, row["uid"], None)
 
 

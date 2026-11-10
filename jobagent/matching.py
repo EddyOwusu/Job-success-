@@ -132,7 +132,9 @@ def score_freshness(job: Job) -> float:
     return 0.1
 
 
-def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Sponsor]) -> ScoreBreakdown:
+def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Sponsor],
+              weights: Optional[dict] = None) -> ScoreBreakdown:
+    """`weights` defaults to WEIGHTS; learn.py supplies tuned ones once you have results."""
     blockers: list[str] = []
     notes: list[str] = []
     text = f"{job.title}\n{job.description}"
@@ -214,7 +216,8 @@ def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Spon
         "skills": skills, "title": title, "seniority": seniority, "location": location,
         "salary": salary, "sponsorship": max(sponsorship, 0.0), "freshness": freshness,
     }
-    total = sum(WEIGHTS[k] * v for k, v in parts.items())
+    w = weights or WEIGHTS
+    total = sum(w.get(k, WEIGHTS[k]) * v for k, v in parts.items())
     if any(d.lower() == job.company.lower() for d in profile.targets.dream_companies):
         total += 5
         notes.append("Dream company")

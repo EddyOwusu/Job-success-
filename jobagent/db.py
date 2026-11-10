@@ -57,6 +57,27 @@ CREATE TABLE IF NOT EXISTS probes (
     sponsor_name TEXT PRIMARY KEY, checked_at TEXT, found TEXT
 );
 
+CREATE TABLE IF NOT EXISTS status_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_uid TEXT, status TEXT, at TEXT, source TEXT   -- source: you | inbox | agent
+);
+
+-- Every Skilled Worker sponsor we have seen, to spot new licences and removals day to day
+CREATE TABLE IF NOT EXISTS sponsor_seen (
+    name TEXT PRIMARY KEY, town TEXT, rating TEXT,
+    first_seen TEXT, last_seen TEXT, removed_at TEXT,
+    baseline INTEGER DEFAULT 0,      -- 1 = was already on the register when tracking started
+    prev_rating TEXT, rating_changed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS inbox_seen (
+    msg_id TEXT PRIMARY KEY, at TEXT, job_uid TEXT, verdict TEXT
+);
+
+CREATE TABLE IF NOT EXISTS learned (
+    key TEXT PRIMARY KEY, value TEXT, at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     at TEXT, kind TEXT, message TEXT
@@ -81,6 +102,25 @@ class DB:
         self.conn = sqlite3.connect(str(path))
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
+        self.conn.commit()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after a database was first created."""
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(applications)")}
+        if "features" not in cols:
+            self.conn.execute("ALTER TABLE applications ADD COLUMN features TEXT")
+        if "outcome_at" not in cols:
+            self.conn.execute("ALTER TABLE applications ADD COLUMN outcome_at TEXT")
+
+    # ------------------------------------------------------------------ learned values
+    def get_learned(self, key: str, default=None):
+        row = self.conn.execute("SELECT value FROM learned WHERE key=?", (key,)).fetchone()
+        return json.loads(row[0]) if row else default
+
+    def set_learned(self, key: str, value) -> None:
+        self.conn.execute("INSERT OR REPLACE INTO learned (key, value, at) VALUES (?,?,?)",
+                          (key, json.dumps(value), now_iso()))
         self.conn.commit()
 
     # ------------------------------------------------------------------ jobs
@@ -152,18 +192,26 @@ class DB:
             "UPDATE jobs SET fit_score=?, assessment_json=? WHERE uid=?", (fit, assessment_json, uid)
         )
 
-    def set_status(self, uid: str, status: str) -> None:
+    def set_status(self, uid: str, status: str, source: str = "agent") -> None:
         self.conn.execute("UPDATE jobs SET status=? WHERE uid=?", (status, uid))
+        if status in ("applied", "interview", "offer", "rejected", "withdrawn"):
+            self.conn.execute("INSERT INTO status_history (job_uid, status, at, source) VALUES (?,?,?,?)",
+                              (uid, status, now_iso(), source))
+            if status != "applied":
+                self.conn.execute("UPDATE applications SET status=?, outcome_at=COALESCE(outcome_at, ?) WHERE job_uid=?",
+                                  (status, now_iso(), uid))
         self.conn.commit()
 
     # ------------------------------------------------------------------ applications
-    def record_application(self, job: sqlite3.Row, method: str, pack_dir: str, notes: str = "") -> None:
+    def record_application(self, job: sqlite3.Row, method: str, pack_dir: str, notes: str = "",
+                           features: dict | None = None) -> None:
         self.conn.execute(
-            "INSERT INTO applications (job_uid, company, title, applied_at, method, pack_dir, notes) VALUES (?,?,?,?,?,?,?)",
-            (job["uid"], job["company"], job["title"], now_iso(), method, pack_dir, notes),
+            "INSERT INTO applications (job_uid, company, title, applied_at, method, pack_dir, notes, features) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (job["uid"], job["company"], job["title"], now_iso(), method, pack_dir, notes,
+             json.dumps(features or {})),
         )
-        self.conn.execute("UPDATE jobs SET status='applied' WHERE uid=?", (job["uid"],))
-        self.conn.commit()
+        self.set_status(job["uid"], "applied", source="you")
 
     def applications_today(self) -> int:
         today = datetime.now(timezone.utc).date().isoformat()

@@ -18,7 +18,7 @@ from typing import Iterable, Optional
 from .http import get_json, session
 
 CONTENT_API = "https://www.gov.uk/api/content/government/publications/register-of-licensed-sponsors-workers"
-REFRESH_SECONDS = 3 * 24 * 3600
+REFRESH_SECONDS = 20 * 3600   # the register is republished every working day; the radar needs each copy
 
 LEGAL_SUFFIXES = {
     "ltd", "limited", "plc", "llp", "lp", "llc", "inc", "incorporated", "corp", "corporation",

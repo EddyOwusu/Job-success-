@@ -38,7 +38,22 @@
    who moved to the UK on a visa), ready-made LinkedIn and Google X-ray search
    links, contacts published in the advert or found with Hunter.io, likely email
    formats, and short outreach and follow-up messages with send dates.
-7. **Announces what matters.** A daily digest (Markdown, email, phone push) shows
+7. **Learns, watches and prepares you.**
+   - **Learns from your results.** Each application stores a snapshot (sector, source,
+     scores, how fresh the advert was). As replies come in, `jobagent learn` shows
+     where your interviews come from, and the scoring re-weights itself towards what
+     works for you.
+   - **Reads your inbox.** It finds replies to your applications (IMAP, read-only) and
+     marks rejections and interview invitations automatically. It never acts on an offer.
+   - **Sponsor radar.** Each day's register is compared with the last. Newly licensed
+     sponsors (often about to hire) are checked for job boards and added to your search.
+     It also warns you if an employer you're pursuing loses its licence or drops to a B
+     rating.
+   - **Interview prep packs.** The moment a job reaches "interview", Claude researches
+     the employer on the web and writes your prep: what to expect, likely questions with
+     answer outlines from your real experience, STAR stories, topics to revise, how to
+     talk about sponsorship and salary, questions to ask, and a checklist.
+8. **Announces what matters.** A daily digest (Markdown, email, phone push) shows
    the best new matches and suggestions such as: *"Terraform appears in 38% of your
    best matches"*, *"Add 'Platform Engineer' to your targets: 12 jobs fit your
    skills"*, *"Monzo has 5 roles for you: network there first"*, *"3 follow-ups due
@@ -81,6 +96,10 @@ leave your machine, apart from the job and CV text sent to the Claude API.
 | `jobagent followups` | Messages and nudges due today |
 | `jobagent status <id> interview` | Update the pipeline (interview, offer, rejected...) |
 | `jobagent network <id>` | Networking plan for any job |
+| `jobagent prep <id> --stage "technical"` | Interview prep pack (also built automatically by `status <id> interview` or an invitation email) |
+| `jobagent inbox` | Read replies to your applications and update their status |
+| `jobagent radar` | Newly licensed sponsors in the last 14 days, and their job boards |
+| `jobagent learn` | What's working: interview rates by sector, source, score, advert age, networking |
 | `jobagent insights` | The agent's suggestions |
 | `jobagent sponsors --check "Monzo" "Revolut"` | Is a company a licensed sponsor? |
 | `jobagent add-board "Aviva" <careers link>` | Search a company's own careers site (Greenhouse, Lever, Ashby, SmartRecruiters, Workday) |
@@ -158,6 +177,37 @@ Indeed. It tries the most promising names first (tech words, tech-hub towns,
 A-rated, not recruitment or outsourcing firms) and remembers what it has already
 checked, so each weekly run goes deeper. Add your own dream companies in
 `data/seed_companies.yaml` or `targets.dream_companies`.
+
+## Learning, inbox, radar and interview prep
+
+**Learning (`jobagent learn`).** Outcomes come from your inbox or from `jobagent status
+<id> interview|rejected|offer`. No reply after 21 days counts as a no. The report breaks
+interview rates down by sector, source, keyword score, Claude fit, advert age, CV writer,
+networking and whether the salary was stated, and reports a group only once it has 5
+results. Scoring weights start changing after 20 applications with a result (3 or more
+of them interviews). Each weight can move to between 0.6x and 1.5x its default. Set
+`scoring.adaptive: false` to keep the defaults.
+
+**Inbox (`jobagent inbox`, also part of `run`).** Add `IMAP_USER` / `IMAP_PASSWORD` to `.env`
+(for Gmail: turn on IMAP and use an App Password). It reads the last 30 days without
+marking anything read, and matches each email to an application by sender, subject and
+the ATS that sent it (Greenhouse, Lever, Workday, NHS Jobs...). Rejections and interview
+invitations update the status; an interview invitation also builds the prep pack and
+sends a push. If the wording is unclear and Claude is set up, that one email is sent to
+Claude to classify. Possible offers are only reported to you.
+
+**Sponsor radar (`jobagent radar`, also part of `run`).** The first run saves a baseline.
+After that, every new register shows newly licensed sponsors, sponsors that disappeared,
+and A-to-B downgrades. Up to 40 promising new sponsors per run are checked for job
+boards, which then join your daily search. Warnings appear in your digest if a company in
+your pipeline loses its licence or is downgraded (a B-rated sponsor can't assign new
+certificates until it fixes its compliance).
+
+**Interview prep (`jobagent prep <id>`).** Saved as `interview-prep.md` in the job's
+application folder. The web research step only sends the company, role and advert,
+never your personal details, and needs web search enabled for your organisation in the
+Claude Console. If research isn't available, the prep is still written from the advert,
+and without Claude you get a fill-in template built from your master CV.
 
 ## NHS, universities and other non-tech employers
 
@@ -249,6 +299,10 @@ jobagent/
   apply/            application packs, browser form filling, rule-based answers
   networking.py     contacts, search links, email patterns, outreach messages
   insights.py       suggestions; digest.py; notify.py
+  learn.py          outcome snapshots, "what's working" report, adaptive weights
+  inbox.py          IMAP reply reader and classifier
+  radar.py          day-to-day sponsor register changes
+  interview.py      researched interview prep packs
 config/             example profile and master CV (copy them with `jobagent init`)
 data/seed_companies.yaml   starting list of employers' job boards
 tests/              pytest suite (run: python -m pytest)
