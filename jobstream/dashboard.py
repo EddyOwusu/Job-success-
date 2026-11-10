@@ -89,24 +89,24 @@ def collect(db: DB, ctx: Context) -> dict:
     for j in shortlist:
         if j["alerted"]:
             todo.append({"kind": "apply", "text": f"Apply today: {j['title']} at {j['company']}",
-                         "cmd": f"jobagent apply {_short(j['uid'])}", "url": j["url"]})
+                         "cmd": f"jobstream apply {_short(j['uid'])}", "url": j["url"]})
     for f in db.due_followups():
         todo.append({"kind": "follow", "text": f"Follow up: {f['company']} ({f['title']}). {f['message']}",
-                     "cmd": f"jobagent followups --done {f['id']}"})
+                     "cmd": f"jobstream followups --done {f['id']}"})
     for j in apps:
         if j["status"] == "interview":
             todo.append({"kind": "interview", "text": f"Interview: {j['company']} ({j['title']}). Read your prep pack.",
-                         "cmd": f"jobagent prep {_short(j['uid'])}"})
+                         "cmd": f"jobstream prep {_short(j['uid'])}"})
     for r in speculative.due_followups(db):
         todo.append({"kind": "follow", "text": f"Follow up your speculative note to {r['company']}",
-                     "cmd": f"jobagent speculative --close \"{r['company']}\""})
+                     "cmd": f"jobstream speculative --close \"{r['company']}\""})
     for r in speculative.unsent(db):
         todo.append({"kind": "send", "text": f"Send your speculative note to {r['company']}",
-                     "cmd": f"jobagent speculative --sent \"{r['company']}\""})
+                     "cmd": f"jobstream speculative --sent \"{r['company']}\""})
     ready = [j for j in shortlist if j["status"] == "packed"]
     if ready:
         todo.append({"kind": "apply", "text": f"{len(ready)} application packs are ready to submit",
-                     "cmd": "jobagent apply --top 5"})
+                     "cmd": "jobstream apply --top 5"})
 
     rep = learn.report(db)
     gap_list, pool = [], 0
@@ -120,7 +120,7 @@ def collect(db: DB, ctx: Context) -> dict:
     return {
         "generated": datetime.now().strftime("%a %d %b %Y, %H:%M"),
         "today": date.today().isoformat(),
-        "title": ctx.settings.get("dashboard", {}).get("title", "Job Agent"),
+        "title": ctx.settings.get("dashboard", {}).get("title", "JobStream"),
         "name": ctx.profile.personal.first_name, "example": bool(ctx.using_examples),
         "holder": {"first": ctx.profile.personal.first_name, "last": ctx.profile.personal.last_name},
         "visa_route": ctx.profile.visa.target_route if ctx.profile.visa.needs_sponsorship else "No sponsor needed",
@@ -159,7 +159,7 @@ def render(data: dict, standalone: bool = True) -> str:
     from .dashboard_page import BODY, CSS, FONTS, JS
 
     payload = json.dumps(data, default=str).replace("</", "<\\/")
-    head = ('<title>Job Search Dashboard</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n'
+    head = ('<title>JobStream Dashboard</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n'
             f"{FONTS}\n<style>{CSS}</style>")
     body = f'{BODY}\n<script type="application/json" id="data">{payload}</script>\n<script>{JS}</script>'
     if not standalone:

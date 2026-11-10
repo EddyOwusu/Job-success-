@@ -29,13 +29,13 @@ def compute(db: DB, ctx: Context) -> list[Insight]:
     due = db.due_followups()
     if due:
         lines = "; ".join(f"{d['company']} ({d['kind']}, due {d['due']})" for d in due[:8])
-        out.append(Insight(1, f"{len(due)} follow-up(s) due", f"{lines}. Run `jobagent followups`."))
+        out.append(Insight(1, f"{len(due)} follow-up(s) due", f"{lines}. Run `jobstream followups`."))
 
     # ---- strong new matches waiting
     waiting = [r for r in rows if r["status"] in ("new", "shortlisted") and (r["fit_score"] or 0) >= ctx.settings["scoring"]["apply_threshold"]]
     if waiting:
         names = ", ".join(f"{r['company']} ({r['title'][:40]})" for r in waiting[:5])
-        out.append(Insight(1, f"{len(waiting)} strong matches ready to apply", f"{names}. Run `jobagent apply --top 5`."))
+        out.append(Insight(1, f"{len(waiting)} strong matches ready to apply", f"{names}. Run `jobstream apply --top 5`."))
 
     # ---- skill gaps, and the projects that close them
     try:
@@ -45,7 +45,7 @@ def compute(db: DB, ctx: Context) -> list[Insight]:
             started = pr["created_at"][:10]
             out.append(Insight(3, f"Project in progress: {pr['skill']}",
                                f"Planned on {started}. The plan is in {pr['plan_path']}. When it's built, run "
-                               f"`jobagent grow --done \"{pr['skill']}\"`."))
+                               f"`jobstream grow --done \"{pr['skill']}\"`."))
         gap_list, pool = growth.gaps(db, ctx, limit=4)
         fresh = [g for g in gap_list if not g.status]
         if fresh and not active:
@@ -55,7 +55,7 @@ def compute(db: DB, ctx: Context) -> list[Insight]:
             out.append(Insight(2, f"{top.skill} would open the most doors",
                                f"Missing from your profile, across {pool} jobs you nearly match: {detail}. "
                                f"{top.skill} is asked for by {', '.join(top.employers[:4])}.{unlock} Get a two-week "
-                               f"project plan with `jobagent grow --plan`. If you already have one of these, add "
+                               f"project plan with `jobstream grow --plan`. If you already have one of these, add "
                                f"it to config/profile.yaml instead."))
     except Exception:
         pass
@@ -88,17 +88,17 @@ def compute(db: DB, ctx: Context) -> list[Insight]:
         for r in speculative.due_followups(db):
             out.append(Insight(1, f"Follow up your note to {r['company']}",
                                f"Sent 7+ days ago with no reply recorded. The follow-up text is in "
-                               f"{r['pack_dir']}/approach.md. Then run `jobagent speculative --close \"{r['company']}\"` "
+                               f"{r['pack_dir']}/approach.md. Then run `jobstream speculative --close \"{r['company']}\"` "
                                f"or `--replied`."))
         waiting = speculative.unsent(db)
         if waiting:
             out.append(Insight(2, f"{len(waiting)} speculative approaches drafted but not sent",
                                ", ".join(r["company"] for r in waiting[:5])
-                               + ". Send them, then run `jobagent speculative --sent \"<company>\"`."))
+                               + ". Send them, then run `jobstream speculative --sent \"<company>\"`."))
         elif speculative.weekly_room(db, ctx) == ctx.settings["speculative"]["max_per_week"] and len(viable) >= 20:
             out.append(Insight(3, "Try a few speculative approaches this week",
                                "Some licensed sponsors use your stack but have no vacancy at your level. "
-                               "See them with `jobagent speculative`."))
+                               "See them with `jobstream speculative`."))
     except Exception:
         pass
 
@@ -108,7 +108,7 @@ def compute(db: DB, ctx: Context) -> list[Insight]:
         names = ", ".join(dict.fromkeys(r["company"] for r, _ in sorted(su, key=lambda x: -x[1]["total"])[:6]))
         out.append(Insight(2, f"{len(su)} open jobs at Scale-up sponsors",
                            f"{names}. On the Scale-up visa you're tied to the sponsor for only 6 months, then you can "
-                           f"move freely. See them with `jobagent list --scaleup`."))
+                           f"move freely. See them with `jobstream list --scaleup`."))
 
     # ---- salary / visa
     sponsor_ok = [b for _, b in breakdowns if b["sponsorship"] > 0]
@@ -136,12 +136,12 @@ def compute(db: DB, ctx: Context) -> list[Insight]:
                             "WHERE j.status='applied' AND a.applied_at < ?", (stale_cut,)).fetchone()[0]
     if stale:
         out.append(Insight(3, f"{stale} applications with no news for 3+ weeks",
-                           "Send one last polite nudge, then mark them with `jobagent status <id> rejected` and move on."))
+                           "Send one last polite nudge, then mark them with `jobstream status <id> rejected` and move on."))
     if not sponsor_ok and rows:
         out.append(Insight(1, "No jobs at licensed sponsors yet",
-                           "Run `jobagent discover` to find more sponsor job boards, and add dream companies to data/seed_companies.yaml."))
+                           "Run `jobstream discover` to find more sponsor job boards, and add dream companies to data/seed_companies.yaml."))
     if ctx.using_examples:
         out.insert(0, Insight(1, "You are using the example profile",
                               "Copy config/profile.example.yaml and config/cv_master.example.yaml to profile.yaml / "
-                              "cv_master.yaml and fill in your real details (`jobagent init`)."))
+                              "cv_master.yaml and fill in your real details (`jobstream init`)."))
     return sorted(out, key=lambda i: i.priority)

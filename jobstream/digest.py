@@ -42,7 +42,7 @@ def build(db: DB, ctx: Context, insights: list[Insight], new_count: int, run_not
     backlog = db.jobs("status IN ('new','shortlisted') AND score >= ?", (thr,),
                       order="COALESCE(fit_score, score) DESC", limit=10)
     counts = dict(db.conn.execute("SELECT status, COUNT(*) FROM jobs GROUP BY status").fetchall())
-    lines = [f"# Job search digest, {date.today():%A %d %B %Y}", "",
+    lines = [f"# JobStream digest, {date.today():%A %d %B %Y}", "",
              f"{new_count} new jobs found this run. Pipeline: " +
              ", ".join(f"{k} {v}" for k, v in sorted(counts.items())), ""]
     if insights:

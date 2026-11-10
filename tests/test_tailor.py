@@ -1,7 +1,7 @@
-from jobagent.apply.answers import classify, pick_option, rule_based_answers
-from jobagent.config import Context
-from jobagent.models import Job, TailoredCV, TailoredRole
-from jobagent.tailor import guard, keyword_tailor
+from jobstream.apply.answers import classify, pick_option, rule_based_answers
+from jobstream.config import Context
+from jobstream.models import Job, TailoredCV, TailoredRole
+from jobstream.tailor import guard, keyword_tailor
 
 
 def test_guard_removes_invented_facts(profile, cv):

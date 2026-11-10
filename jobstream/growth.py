@@ -242,7 +242,7 @@ def plan_markdown(g: Gap, p: ProjectPlan) -> str:
     o += ["## Done means", ""] + [f"- [ ] {x}" for x in p.definition_of_done]
     o += ["", "## Publish", ""] + [f"- [ ] {x}" for x in p.what_to_publish]
     o += ["", "## When it's finished", "",
-          f"Run `jobagent grow --done \"{g.skill}\"`. It shows what to paste into your profile and master CV.", "",
+          f"Run `jobstream grow --done \"{g.skill}\"`. It shows what to paste into your profile and master CV.", "",
           "CV bullets (fill in the [placeholders] with what you really measured):", ""] + [f"- {x}" for x in p.cv_bullets_when_done]
     o += ["", "## Interview talking points", ""] + [f"- {x}" for x in p.interview_talking_points]
     o += ["", "## Stretch goals", ""] + [f"- {x}" for x in p.stretch_goals]
@@ -274,7 +274,7 @@ def done_snippet(skill: str) -> str:
     description: <one sentence: what you built with {skill} and what you measured>
     tags: [{skill.lower()}, <other tech you used>]
 
-3) Run `jobagent search` to re-score your jobs with the new skill."""
+3) Run `jobstream search` to re-score your jobs with the new skill."""
 
 
 def active(db: DB) -> list:

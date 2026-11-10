@@ -10,12 +10,12 @@ import yaml
 
 from .models import MasterCV, Profile
 
-ROOT = Path(os.environ.get("JOBAGENT_HOME", Path(__file__).resolve().parent.parent))
+ROOT = Path(os.environ.get("JOBSTREAM_HOME", Path(__file__).resolve().parent.parent))
 CONFIG_DIR = ROOT / "config"
 DATA_DIR = ROOT / "data"
 CACHE_DIR = DATA_DIR / "cache"
 OUTPUT_DIR = ROOT / "output"
-DB_PATH = DATA_DIR / "jobagent.db"
+DB_PATH = DATA_DIR / "jobstream.db"
 
 
 def load_dotenv(path: Path | None = None) -> None:
@@ -101,7 +101,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "chromium_path": "",          # leave blank to use Playwright's own browser
     },
     "dashboard": {
-        "title": "Job Agent",         # the name on the dashboard's cover; call it what you like
+        "title": "JobStream",         # the product name shown in the dashboard's sidebar
     },
     "speculative": {
         "max_per_week": 5,            # approach packs drafted per week (quality over volume)
@@ -157,7 +157,7 @@ def _pick(name: str) -> Path:
     example = CONFIG_DIR / f"{name}.example.yaml"
     if example.exists():
         return example
-    raise FileNotFoundError(f"Missing {real}. Run `jobagent init` first.")
+    raise FileNotFoundError(f"Missing {real}. Run `jobstream init` first.")
 
 
 @dataclass

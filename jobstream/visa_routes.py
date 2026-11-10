@@ -298,7 +298,7 @@ def insights_for(routes: list[Route]) -> list[tuple[int, str, str]]:
     for r in routes:
         if r.name.startswith("High Potential") and r.status in ("likely", "possible"):
             out.append((1, "You may not need a sponsor at all (HPI visa)",
-                        r.summary + " Run `jobagent visa` for the steps."))
+                        r.summary + " Run `jobstream visa` for the steps."))
         if r.name == "Skilled Worker":
             for d in r.details:
                 if d.startswith("New-entrant rate") and r.next_steps:
@@ -306,7 +306,7 @@ def insights_for(routes: list[Route]) -> list[tuple[int, str, str]]:
                 if d.startswith("gov.uk now says"):
                     out.append((1, "A visa salary threshold has changed", d))
         if r.name in ("Youth Mobility Scheme", "India Young Professionals Scheme"):
-            out.append((2, f"{r.name} may be open to you", r.summary + " Run `jobagent visa`."))
+            out.append((2, f"{r.name} may be open to you", r.summary + " Run `jobstream visa`."))
     return out
 
 

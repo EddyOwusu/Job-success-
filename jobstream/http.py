@@ -12,7 +12,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-USER_AGENT = "jobagent/0.1 (personal job search assistant)"
+USER_AGENT = "jobstream/0.1 (personal job search assistant)"
 
 _session: Optional[requests.Session] = None
 _lock = threading.Lock()

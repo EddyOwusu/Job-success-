@@ -204,7 +204,7 @@ def watch(db: DB, ctx: Context, llm: Optional[LLM], say: Callable[[str], None] =
     for i in health.insights(db):
         if i.priority == 1 and db.get_learned(f"health_alerted:{i.title}") != datetime.now(timezone.utc).date().isoformat():
             say(f"  ! {i.title}: {i.detail}")
-            notify.push(f"Job agent: {i.title}", i.detail)
+            notify.push(f"JobStream: {i.title}", i.detail)
             db.set_learned(f"health_alerted:{i.title}", datetime.now(timezone.utc).date().isoformat())
     db.log("watch", f"new={st.new} hot={len(hot)}")
     _refresh_dashboard(db, ctx)
@@ -300,7 +300,7 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
             for u in inbox.sync(db, ctx, llm, on_interview=on_interview):
                 if u.verdict == "offer":
                     extra_insights.append(Insight(1, f"Possible offer from {u.company}",
-                                                  f"Email: \"{u.subject}\". Check it, then run `jobagent status <id> offer`."))
+                                                  f"Email: \"{u.subject}\". Check it, then run `jobstream status <id> offer`."))
                 elif u.verdict == "interview":
                     extra_insights.append(Insight(1, f"Interview invitation: {u.company}",
                                                   f"{u.title}. Your prep pack is in the application folder (interview-prep.md)."))
@@ -320,9 +320,9 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
     say(f"Digest written to {path}")
     top_titles = [f"{r['company']}: {r['title']}" for r in best[:3]]
     if st.new or ins:
-        notify.push(f"Job agent: {st.new} new, {st.packed} ready, {st.applied} applied",
+        notify.push(f"JobStream: {st.new} new, {st.packed} ready, {st.applied} applied",
                     ("\n".join(top_titles) + "\n\n" + "\n".join(f"- {i.title}" for i in ins[:4])).strip())
-        notify.email(f"Job digest: {st.new} new jobs, {st.packed} applications ready", md, digest.to_html(md))
+        notify.email(f"JobStream digest: {st.new} new jobs, {st.packed} applications ready", md, digest.to_html(md))
     db.log("run", f"fetched={st.fetched} new={st.new} short={st.shortlisted} assessed={st.assessed} "
                   f"packed={st.packed} applied={st.applied}")
     _refresh_dashboard(db, ctx)

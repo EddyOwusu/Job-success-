@@ -1,11 +1,11 @@
 import json
 from datetime import datetime, timezone
 
-from jobagent import dashboard, growth, health
-from jobagent.config import Context
-from jobagent.db import DB
-from jobagent.models import Job
-from jobagent.skills import extract_skills, extract_weighted
+from jobstream import dashboard, growth, health
+from jobstream.config import Context
+from jobstream.db import DB
+from jobstream.models import Job
+from jobstream.skills import extract_skills, extract_weighted
 
 
 class J:
@@ -126,7 +126,7 @@ def test_dashboard_builds_and_escapes(tmp_path, monkeypatch, profile, cv, settin
     data = dashboard.collect(db, ctx)
     assert data["counts"]["shortlisted"] == 1 and data["shortlist"][0]["matched"] == ["Python"]
     page = dashboard.render(data)
-    assert page.startswith("<!doctype html>") and 'id="brand"' in page and data["title"] == "Job Agent"
+    assert page.startswith("<!doctype html>") and 'id="brand"' in page and data["title"] == "JobStream"
     assert "</script><script>alert(1)" not in page            # job text can't break out of the data block
     assert json.loads(page.split('id="data">')[1].split("</script>")[0].replace("<\\/", "</"))["shortlist"][0]["title"] == "Backend Engineer"
     frag = dashboard.render(data, standalone=False)

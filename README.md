@@ -1,7 +1,9 @@
-# Job-success: a personal agent for landing a sponsored UK tech job
+# JobStream
 
-`jobagent` is a Python agent built to get one person hired in UK tech on a
-**Skilled Worker visa**. Every day it:
+A personal agent for landing a UK tech job that comes with visa sponsorship.
+
+JobStream is a Python agent built to get one person hired in UK tech on a
+**Skilled Worker visa**. You run it with the `jobstream` command. Every day it:
 
 1. **Searches deep, beyond tech companies.** Plenty of IT jobs that come with
    sponsorship are at hospitals, universities, banks and other big employers, so
@@ -14,7 +16,7 @@
      engineers, developers, systems and data roles).
    - **Big non-tech employers** on Workday: Lloyds, Barclays, LSEG, GSK, AstraZeneca,
      Aviva, Unilever, Rolls-Royce, Shell and more. Add any company with
-     `jobagent add-board "<name>" <careers link>`.
+     `jobstream add-board "<name>" <careers link>`.
    - **Reed and Adzuna** (every sector) if you add their free API keys.
 2. **Keeps only jobs that can sponsor you.** It checks every employer against the
    Home Office **register of licensed sponsors** (downloaded from gov.uk, about
@@ -40,7 +42,7 @@
    formats, and short outreach and follow-up messages with send dates.
 7. **Learns, watches and prepares you.**
    - **Learns from your results.** Each application stores a snapshot (sector, source,
-     scores, how fresh the advert was). As replies come in, `jobagent learn` shows
+     scores, how fresh the advert was). As replies come in, `jobstream learn` shows
      where your interviews come from, and the scoring re-weights itself towards what
      works for you.
    - **Reads your inbox.** It finds replies to your applications (IMAP, read-only) and
@@ -56,13 +58,13 @@
    - **Speculative approaches.** It ranks licensed sponsors that use your stack but
      have no vacancy at your level, explains why each is worth a note, and drafts the
      note, a follow-up and a CV aimed at that company. You send them, a few a week.
-   - **Speed alerts.** `jobagent watch` is a 1-2 minute check you schedule a few times a
+   - **Speed alerts.** `jobstream watch` is a 1-2 minute check you schedule a few times a
      day. Excellent, freshly posted jobs trigger an "Apply today" push.
-   - **Other visa routes.** `jobagent visa` checks, against live gov.uk pages, whether
+   - **Other visa routes.** `jobstream visa` checks, against live gov.uk pages, whether
      you qualify for routes beyond standard sponsorship: the HPI visa (no sponsor
      needed), the Scale-up visa (free to move after 6 months), the new-entrant salary
      rate and nationality-based schemes. Jobs at Scale-up sponsors are marked.
-   - **Skill gaps into projects.** `jobagent grow` shows which missing skills cost you the
+   - **Skill gaps into projects.** `jobstream grow` shows which missing skills cost you the
      most near-miss jobs and writes a two-week portfolio project plan for the top one.
    - **Dashboard.** One page with today's actions, your shortlist, pipeline, results
      and source health, on your PC or on your phone over home Wi-Fi.
@@ -84,17 +86,17 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[apply]"            # or: pip install -r requirements.txt
 playwright install chromium          # for automatic form filling
 
-jobagent init                        # creates config/profile.yaml, config/cv_master.yaml, config/settings.yaml, .env
+jobstream init                        # creates config/profile.yaml, config/cv_master.yaml, config/settings.yaml, .env
 # 1. fill in config/profile.yaml   (who you are, what you want, visa situation)
 # 2. fill in config/cv_master.yaml (EVERYTHING you've done; the more facts, the better the CVs)
 # 3. put your ANTHROPIC_API_KEY (and optional keys) in .env
 
-jobagent doctor                      # checks your setup
-jobagent discover                    # finds job boards of licensed sponsors (run weekly)
-jobagent run --mode pack             # first run: search, score, assess, build application packs
-jobagent list                        # your shortlist
-jobagent show <id>                   # why a job scored as it did, plus Claude's assessment
-jobagent apply <id>                  # fill the form in a browser; you check it and press Submit
+jobstream doctor                      # checks your setup
+jobstream discover                    # finds job boards of licensed sponsors (run weekly)
+jobstream run --mode pack             # first run: search, score, assess, build application packs
+jobstream list                        # your shortlist
+jobstream show <id>                   # why a job scored as it did, plus Claude's assessment
+jobstream apply <id>                  # fill the form in a browser; you check it and press Submit
 ```
 
 Your personal files (`config/profile.yaml`, `config/cv_master.yaml`,
@@ -105,30 +107,30 @@ leave your machine, apart from the job and CV text sent to the Claude API.
 
 | Command | What it does |
 |---|---|
-| `jobagent run` | The full daily loop: search, score, assess, prepare the best matches, digest, notify |
-| `jobagent run --mode review --max-apply 5` | Also open the 5 best applications in a browser for you to submit |
-| `jobagent apply --top 5` | Prepare and apply to the 5 best shortlisted jobs |
-| `jobagent apply <id> --mode dry` | Fill the form in a hidden browser and save a screenshot; never submits |
-| `jobagent mark-applied <id>` | You applied by hand: track it and schedule follow-ups |
-| `jobagent followups` | Messages and nudges due today |
-| `jobagent status <id> interview` | Update the pipeline (interview, offer, rejected...) |
-| `jobagent network <id>` | Networking plan for any job |
-| `jobagent prep <id> --stage "technical"` | Interview prep pack (also built automatically by `status <id> interview` or an invitation email) |
-| `jobagent inbox` | Read replies to your applications and update their status |
-| `jobagent radar` | Newly licensed sponsors in the last 14 days, and their job boards |
-| `jobagent watch` | Quick check for fresh jobs; pushes "Apply today" for the best ones |
-| `jobagent schedule --install` | Put the daily run and quick checks on a timetable (Windows Task Scheduler or cron) |
-| `jobagent speculative` | Sponsors worth approaching without a vacancy; `--build 3` drafts the notes and CVs |
-| `jobagent visa` | Which visa routes are open to you, checked on gov.uk |
-| `jobagent list --scaleup` | Open jobs at Scale-up sponsors |
-| `jobagent dashboard --open` | The dashboard in your browser (`--lan` to read it on your phone) |
-| `jobagent grow` | Your skill gaps; `--plan` writes a two-week project plan for the top one |
-| `jobagent health` | Is every job source still working? |
-| `jobagent learn` | What's working: interview rates by sector, source, score, advert age, networking |
-| `jobagent insights` | The agent's suggestions |
-| `jobagent sponsors --check "Monzo" "Revolut"` | Is a company a licensed sponsor? |
-| `jobagent add-board "Aviva" <careers link>` | Search a company's own careers site (Greenhouse, Lever, Ashby, SmartRecruiters, Workday) |
-| `jobagent discover --max 800` | Probe more sponsor companies for job boards |
+| `jobstream run` | The full daily loop: search, score, assess, prepare the best matches, digest, notify |
+| `jobstream run --mode review --max-apply 5` | Also open the 5 best applications in a browser for you to submit |
+| `jobstream apply --top 5` | Prepare and apply to the 5 best shortlisted jobs |
+| `jobstream apply <id> --mode dry` | Fill the form in a hidden browser and save a screenshot; never submits |
+| `jobstream mark-applied <id>` | You applied by hand: track it and schedule follow-ups |
+| `jobstream followups` | Messages and nudges due today |
+| `jobstream status <id> interview` | Update the pipeline (interview, offer, rejected...) |
+| `jobstream network <id>` | Networking plan for any job |
+| `jobstream prep <id> --stage "technical"` | Interview prep pack (also built automatically by `status <id> interview` or an invitation email) |
+| `jobstream inbox` | Read replies to your applications and update their status |
+| `jobstream radar` | Newly licensed sponsors in the last 14 days, and their job boards |
+| `jobstream watch` | Quick check for fresh jobs; pushes "Apply today" for the best ones |
+| `jobstream schedule --install` | Put the daily run and quick checks on a timetable (Windows Task Scheduler or cron) |
+| `jobstream speculative` | Sponsors worth approaching without a vacancy; `--build 3` drafts the notes and CVs |
+| `jobstream visa` | Which visa routes are open to you, checked on gov.uk |
+| `jobstream list --scaleup` | Open jobs at Scale-up sponsors |
+| `jobstream dashboard --open` | The dashboard in your browser (`--lan` to read it on your phone) |
+| `jobstream grow` | Your skill gaps; `--plan` writes a two-week project plan for the top one |
+| `jobstream health` | Is every job source still working? |
+| `jobstream learn` | What's working: interview rates by sector, source, score, advert age, networking |
+| `jobstream insights` | The agent's suggestions |
+| `jobstream sponsors --check "Monzo" "Revolut"` | Is a company a licensed sponsor? |
+| `jobstream add-board "Aviva" <careers link>` | Search a company's own careers site (Greenhouse, Lever, Ashby, SmartRecruiters, Workday) |
+| `jobstream discover --max 800` | Probe more sponsor companies for job boards |
 
 Each prepared application lands in `output/applications/<date>_<company>_<title>/`:
 
@@ -146,20 +148,20 @@ form-filled.png screenshot of the filled form (browser modes)
 ### Put it on a timetable
 
 ```bash
-jobagent schedule             # shows the timetable and the exact commands
-jobagent schedule --install   # creates it (Windows Task Scheduler, or cron on Mac/Linux)
-jobagent schedule --remove
+jobstream schedule             # shows the timetable and the exact commands
+jobstream schedule --install   # creates it (Windows Task Scheduler, or cron on Mac/Linux)
+jobstream schedule --remove
 ```
 
 | Time | What runs |
 |---|---|
-| 07:10 daily | `jobagent run --mode pack`: full search, assessment, packs, inbox, radar, digest |
-| 11:30, 15:30, 19:30 daily | `jobagent watch`: quick check, "Apply today" alerts |
-| 06:40 Mondays | `jobagent discover`: more sponsor job boards |
+| 07:10 daily | `jobstream run --mode pack`: full search, assessment, packs, inbox, radar, digest |
+| 11:30, 15:30, 19:30 daily | `jobstream watch`: quick check, "Apply today" alerts |
+| 06:40 Mondays | `jobstream discover`: more sponsor job boards |
 
 Your computer must be on and awake at those times.
 
-Then each evening run `jobagent apply --top 5` (review mode), check each form and
+Then each evening run `jobstream apply --top 5` (review mode), check each form and
 press Submit. That takes about 15 minutes a day for 5 strong, tailored applications.
 
 ## Apply modes
@@ -201,7 +203,7 @@ Jobs Claude rates at least `scoring.apply_threshold` (70) get application packs.
 
 ## Discovery: finding jobs others miss
 
-`jobagent discover` turns sponsor-register names into likely job-board slugs
+`jobstream discover` turns sponsor-register names into likely job-board slugs
 ("Thought Machine Group Limited" becomes `thoughtmachine` / `thought-machine`)
 and checks Greenhouse, Lever and Ashby. A hit is a career page at a company
 **already licensed to sponsor you**, and many of those jobs never reach LinkedIn or
@@ -212,7 +214,7 @@ checked, so each weekly run goes deeper. Add your own dream companies in
 
 ## Learning, inbox, radar and interview prep
 
-**Learning (`jobagent learn`).** Outcomes come from your inbox or from `jobagent status
+**Learning (`jobstream learn`).** Outcomes come from your inbox or from `jobstream status
 <id> interview|rejected|offer`. No reply after 21 days counts as a no. The report breaks
 interview rates down by sector, source, keyword score, Claude fit, advert age, CV writer,
 networking and whether the salary was stated, and reports a group only once it has 5
@@ -220,7 +222,7 @@ results. Scoring weights start changing after 20 applications with a result (3 o
 of them interviews). Each weight can move to between 0.6x and 1.5x its default. Set
 `scoring.adaptive: false` to keep the defaults.
 
-**Inbox (`jobagent inbox`, also part of `run`).** Add `IMAP_USER` / `IMAP_PASSWORD` to `.env`
+**Inbox (`jobstream inbox`, also part of `run`).** Add `IMAP_USER` / `IMAP_PASSWORD` to `.env`
 (for Gmail: turn on IMAP and use an App Password). It reads the last 30 days without
 marking anything read, and matches each email to an application by sender, subject and
 the ATS that sent it (Greenhouse, Lever, Workday, NHS Jobs...). Rejections and interview
@@ -228,14 +230,14 @@ invitations update the status; an interview invitation also builds the prep pack
 sends a push. If the wording is unclear and Claude is set up, that one email is sent to
 Claude to classify. Possible offers are only reported to you.
 
-**Sponsor radar (`jobagent radar`, also part of `run`).** The first run saves a baseline.
+**Sponsor radar (`jobstream radar`, also part of `run`).** The first run saves a baseline.
 After that, every new register shows newly licensed sponsors, sponsors that disappeared,
 and A-to-B downgrades. Up to 40 promising new sponsors per run are checked for job
 boards, which then join your daily search. Warnings appear in your digest if a company in
 your pipeline loses its licence or is downgraded (a B-rated sponsor can't assign new
 certificates until it fixes its compliance).
 
-**Interview prep (`jobagent prep <id>`).** Saved as `interview-prep.md` in the job's
+**Interview prep (`jobstream prep <id>`).** Saved as `interview-prep.md` in the job's
 application folder. The web research step only sends the company, role and advert,
 never your personal details, and needs web search enabled for your organisation in the
 Claude Console. If research isn't available, the prep is still written from the advert,
@@ -243,7 +245,7 @@ and without Claude you get a fill-in template built from your master CV.
 
 ## Speculative approaches, speed alerts and visa routes
 
-**Speculative (`jobagent speculative`).** A target must be a licensed sponsor, share skills
+**Speculative (`jobstream speculative`).** A target must be a licensed sponsor, share skills
 with you, have no vacancy you're already pursuing, and not say "no sponsorship" across its
 adverts. NHS bodies and universities are left out because they must hire through
 advertised vacancies. Ranking favours companies that use more of your stack, are hiring
@@ -252,16 +254,16 @@ entry says why no vacancy fits today (usually: their open roles are too senior).
 `--build N` writes `output/speculative/<date>_<company>/approach.md` (why them, what you
 could offer, who to contact with search links, a LinkedIn note, an email, a follow-up)
 plus a CV aimed at their stack. The limit is `speculative.max_per_week` (5). After sending,
-run `jobagent speculative --sent "<company>"`; you're reminded to follow up after 7 days.
+run `jobstream speculative --sent "<company>"`; you're reminded to follow up after 7 days.
 The agent never sends messages itself.
 
-**Speed alerts (`jobagent watch`).** A job triggers "Apply today" when it was first seen in
+**Speed alerts (`jobstream watch`).** A job triggers "Apply today" when it was first seen in
 the last 48 hours, isn't an old advert we only just found, and has a Claude fit of 85+
 (or a keyword score of 75+ if Claude hasn't assessed it). Each job alerts once. Change
 the bars under `alerts:` in settings. Repeat searches are fast because adverts already
 stored aren't downloaded again.
 
-**Visa routes (`jobagent visa`).** Reads the current rules from gov.uk (cached for a week):
+**Visa routes (`jobstream visa`).** Reads the current rules from gov.uk (cached for a week):
 
 | Route | What the agent checks |
 |---|---|
@@ -277,7 +279,7 @@ This is a pointer to the right gov.uk pages, not immigration advice.
 
 ## Dashboard, skill projects and source health
 
-**Dashboard (`jobagent dashboard`).** Rebuilt as `output/dashboard.html` after every run:
+**Dashboard (`jobstream dashboard`).** Rebuilt as `output/dashboard.html` after every run:
 a single file that opens without internet (it falls back to system fonts when offline).
 It is a restrained product UI in the manner of modern fintech dashboards: the
 platform's own typeface (San Francisco on Apple devices, Inter elsewhere), neutral surfaces
@@ -293,7 +295,7 @@ serves a live copy at `http://127.0.0.1:8765`; `--lan` also makes it reachable f
 phone on the same Wi-Fi, behind a random address printed when it starts. The page is
 read-only: nothing on it can change or submit anything.
 
-**Skill projects (`jobagent grow`).** For each skill missing from your profile it shows
+**Skill projects (`jobstream grow`).** For each skill missing from your profile it shows
 the share of your near-match jobs that ask for it, how often it's a hard requirement, which
 employers ask, and how many near-miss jobs would reach your shortlist with it. Skills only
 named in a company's intro paragraph are ignored. `--plan [skill]` writes
@@ -303,7 +305,7 @@ for results you must measure) and interview talking points. `--start`, `--done` 
 `--drop` track it. `--done` shows exactly what to paste into your profile and master CV;
 the agent never adds a skill for you.
 
-**Source health (`jobagent health`).** A source is flagged when it returns nothing but
+**Source health (`jobstream health`).** A source is flagged when it returns nothing but
 used to return results, when every search errors, when 40% or more of one system's company
 boards go empty at once, when one board is empty for three runs (it may have moved), or
 when adverts come back without their text (the page layout changed). Broken sources go to
@@ -383,7 +385,7 @@ recommended fallback model instead of failing.
 ## Project layout
 
 ```
-jobagent/
+jobstream/
   cli.py            commands
   pipeline.py       the daily loop
   sources/          greenhouse, lever, ashby, smartrecruiters, workday, nhs, jobsacuk, reed, adzuna
@@ -410,7 +412,7 @@ jobagent/
   growth.py         skill gaps and two-week project plans
   dashboard.py      the one-page dashboard and its read-only server
   health.py         per-source run history and breakage detection
-config/             example profile and master CV (copy them with `jobagent init`)
+config/             example profile and master CV (copy them with `jobstream init`)
 data/seed_companies.yaml   starting list of employers' job boards
 tests/              pytest suite (run: python -m pytest)
 ```

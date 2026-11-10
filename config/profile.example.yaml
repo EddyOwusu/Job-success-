@@ -100,7 +100,7 @@ visa:
   target_route: Skilled Worker    # UK Skilled Worker visa
   current_status: "Outside the UK, no current UK visa"   # e.g. "Graduate visa valid until 2027-06"
   nationality: ""                 # e.g. Ghanaian. Used on forms that require it and to check
-                                  # nationality-based schemes (run `jobagent visa`)
+                                  # nationality-based schemes (run `jobstream visa`)
   date_of_birth: ""               # YYYY-MM-DD. Optional: checks the under-26 new-entrant salary rule
   had_graduate_visa: false        # true if you've ever held a UK Graduate visa
   # New entrants (under 26, recent graduates, or switching from a Student/Graduate

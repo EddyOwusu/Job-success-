@@ -126,7 +126,7 @@ def insights(db: DB) -> list[Insight]:
     for s in rows:
         if s.state == "broken":
             out.append(Insight(1, f"{s.name} looks broken", s.detail + " You may be missing jobs from this source. "
-                               "Run `jobagent health`, and check for an update to the agent."))
+                               "Run `jobstream health`, and check for an update to the agent."))
         elif s.state == "warn":
             out.append(Insight(3, f"Check {s.name}", s.detail))
     return out
@@ -135,7 +135,7 @@ def insights(db: DB) -> list[Insight]:
 def report(db: DB) -> str:
     rows = status(db)
     if not rows:
-        return "No runs recorded yet. Run `jobagent search` first."
+        return "No runs recorded yet. Run `jobstream search` first."
     mark = {"ok": "OK    ", "new": "NEW   ", "warn": "CHECK ", "broken": "BROKEN"}
     lines = [f"{'':7}{'source':<34}{'boards':>7}{'postings seen':>15}  last run"]
     for s in rows:

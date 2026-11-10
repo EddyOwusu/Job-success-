@@ -3,11 +3,11 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
-from jobagent import inbox, interview, learn, radar
-from jobagent.config import Context
-from jobagent.db import DB
-from jobagent.models import Job
-from jobagent.sponsors import from_csv_text
+from jobstream import inbox, interview, learn, radar
+from jobstream.config import Context
+from jobstream.db import DB
+from jobstream.models import Job
+from jobstream.sponsors import from_csv_text
 
 HEAD = "Organisation Name,Town/City,County,Type & Rating,Route\n"
 DAY1 = HEAD + """Monzo Bank Ltd,London,,Worker (A rating),Skilled Worker

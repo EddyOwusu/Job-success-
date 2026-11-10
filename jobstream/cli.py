@@ -1,4 +1,4 @@
-"""Command line interface: `python -m jobagent <command>` (or `jobagent <command>` once installed)."""
+"""Command line interface: `python -m jobstream <command>` (or `jobstream <command>` once installed)."""
 from __future__ import annotations
 
 import argparse
@@ -21,7 +21,7 @@ def _ctx_db():
     ensure_dirs()
     ctx = load_context()
     if ctx.using_examples:
-        print(f"! Using the EXAMPLE {', '.join(ctx.using_examples)}. Run `jobagent init` and fill in your details.\n")
+        print(f"! Using the EXAMPLE {', '.join(ctx.using_examples)}. Run `jobstream init` and fill in your details.\n")
     return ctx, DB(DB_PATH)
 
 
@@ -46,14 +46,14 @@ def cmd_init(a):
             print(f"  created  {dst}  <- fill this in")
     settings = CONFIG_DIR / "settings.yaml"
     if not settings.exists():
-        settings.write_text("# Agent settings. Delete anything you don't change; defaults live in jobagent/config.py\n"
+        settings.write_text("# Agent settings. Delete anything you don't change; defaults live in jobstream/config.py\n"
                             + yaml.safe_dump(config.DEFAULT_SETTINGS, sort_keys=False), encoding="utf-8")
         print(f"  created  {settings}")
     env = ROOT / ".env"
     if not env.exists():
         shutil.copy(ROOT / ".env.example", env)
         print(f"  created  {env}  <- add your API keys")
-    print("\nNext: edit those files, then run `jobagent doctor`, `jobagent discover` and `jobagent run`.")
+    print("\nNext: edit those files, then run `jobstream doctor`, `jobstream discover` and `jobstream run`.")
 
 
 def cmd_doctor(a):
@@ -169,7 +169,7 @@ def cmd_search(a):
     reg = load_register(ctx)
     collect(db, ctx, reg)
     n = score_all(db, ctx, reg)
-    print(f"{n} jobs on the shortlist. See them with `jobagent list`.")
+    print(f"{n} jobs on the shortlist. See them with `jobstream list`.")
 
 
 def cmd_assess(a):
@@ -180,7 +180,7 @@ def cmd_assess(a):
     if not llm:
         return 1
     n = assess_top(db, ctx, llm, limit=a.limit)
-    print(f"Assessed {n} jobs ({llm.usage_summary()}). See them with `jobagent list`.")
+    print(f"Assessed {n} jobs ({llm.usage_summary()}). See them with `jobstream list`.")
 
 
 def cmd_list(a):
@@ -190,7 +190,7 @@ def cmd_list(a):
         rows = [r for r in db.jobs("score_json LIKE '%\"scaleup\":true%' AND status!='skipped'",
                                    order="COALESCE(fit_score, score) DESC", limit=a.limit)]
         if not rows:
-            print("No open jobs at Scale-up sponsors yet. Run `jobagent discover` then `jobagent search`.")
+            print("No open jobs at Scale-up sponsors yet. Run `jobstream discover` then `jobstream search`.")
             return
         for r in rows:
             print(f"{r['score'] or 0:>5.0f}  {r['status']:<11} {r['company'][:22]:<22} {r['title'][:48]:<48} {r['uid']}")
@@ -201,7 +201,7 @@ def cmd_list(a):
         where = "status IN ('shortlisted','packed','applied','interview','offer')"
     rows = db.jobs(where, params, order="COALESCE(fit_score, score) DESC", limit=a.limit)
     if not rows:
-        print("Nothing yet. Run `jobagent search` (or `jobagent run`).")
+        print("Nothing yet. Run `jobstream search` (or `jobstream run`).")
         return
     print(f"{'fit':>4} {'score':>5}  {'status':<11} {'company':<20} {'title':<45} id")
     for r in rows:
@@ -249,7 +249,7 @@ def cmd_apply(a):
         ids = [r["uid"] for r in db.jobs(f"status='shortlisted' AND {col} >= ?", (thr,),
                                          order=f"{col} DESC", limit=a.top)]
         if not ids:
-            print(f"No shortlisted jobs with {col} >= {thr}. Run `jobagent assess` or lower scoring.apply_threshold.")
+            print(f"No shortlisted jobs with {col} >= {thr}. Run `jobstream assess` or lower scoring.apply_threshold.")
             return
     for uid in ids:
         out = prepare_and_apply(db, ctx, llm, uid, mode=a.mode, force=a.force)
@@ -308,8 +308,8 @@ def cmd_dashboard(a):
             import webbrowser
             webbrowser.open(path.as_uri())
         else:
-            print("Open that file in your browser, or run `jobagent dashboard --open`.\n"
-                  "To read it on your phone: `jobagent dashboard --lan` (same Wi-Fi).")
+            print("Open that file in your browser, or run `jobstream dashboard --open`.\n"
+                  "To read it on your phone: `jobstream dashboard --lan` (same Wi-Fi).")
         return
 
     def page():
@@ -334,7 +334,7 @@ def cmd_grow(a):
         if flag:
             skill = growth.set_status(db, flag, status)
             if not skill:
-                print(f"No project planned for '{flag}'. Plan one with `jobagent grow --plan \"{flag}\"`.")
+                print(f"No project planned for '{flag}'. Plan one with `jobstream grow --plan \"{flag}\"`.")
                 return 1
             print(f"{skill} -> {status}")
             if status == "done":
@@ -342,7 +342,7 @@ def cmd_grow(a):
             return
     gap_list, pool = growth.gaps(db, ctx)
     if not gap_list:
-        print(f"Not enough data yet ({pool} near-match jobs; need {growth.MIN_JOBS}). Run `jobagent search` first.")
+        print(f"Not enough data yet ({pool} near-match jobs; need {growth.MIN_JOBS}). Run `jobstream search` first.")
         return
     if a.plan is not None:
         want = a.plan.lower()
@@ -353,7 +353,7 @@ def cmd_grow(a):
             return 1
         print(f"Planning a project for {g.skill}...")
         path = growth.plan(db, ctx, _llm(ctx), g)
-        print(f"Plan written: {path}\nStart it with `jobagent grow --start \"{g.skill}\"`.")
+        print(f"Plan written: {path}\nStart it with `jobstream grow --start \"{g.skill}\"`.")
         return
     print(f"Skills missing from your profile, across {pool} jobs you nearly match:\n")
     print(f"  {'skill':<18}{'asked in':>9}{'required':>10}{'unlocks':>9}   employers")
@@ -361,7 +361,7 @@ def cmd_grow(a):
         tag = f"  [{g.status.replace('_', ' ')}]" if g.status else ""
         print(f"  {g.skill:<18}{g.share:>8.0%}{g.required_share:>10.0%}{g.unlocks:>9}   {', '.join(g.employers[:4])}{tag}")
     print("\n'unlocks' = near-miss jobs that would reach your shortlist with that skill.")
-    print("Plan a two-week project for the top one with `jobagent grow --plan`, or name one: --plan Kubernetes.")
+    print("Plan a two-week project for the top one with `jobstream grow --plan`, or name one: --plan Kubernetes.")
     print("Already have one of these? Add it to config/profile.yaml instead.")
 
 
@@ -387,7 +387,7 @@ def cmd_speculative(a):
     reg = load_register(ctx)
     ts = speculative.targets(db, ctx, reg, limit=a.limit)
     if not ts:
-        print("No targets yet. Run `jobagent search` first so I know which sponsors use your skills.")
+        print("No targets yet. Run `jobstream search` first so I know which sponsors use your skills.")
         return
     if a.build:
         room = speculative.weekly_room(db, ctx)
@@ -410,7 +410,7 @@ def cmd_speculative(a):
     waiting = speculative.unsent(db)
     if waiting:
         print("\nDrafted, not sent yet: " + ", ".join(r["company"] for r in waiting))
-    print("\nDraft the notes and a CV for the top 3 with `jobagent speculative --build 3`.")
+    print("\nDraft the notes and a CV for the top 3 with `jobstream speculative --build 3`.")
 
 
 def cmd_watch(a):
@@ -435,8 +435,8 @@ def cmd_schedule(a):
     kind, lines = schedule.plan(log)
     print("The timetable (your computer must be on at these times):\n")
     for name, (freq, at), args, why in schedule.TASKS:
-        print(f"  {at}  {'Mondays' if freq == 'WEEKLY' else 'daily  '}  jobagent {args:<16} {why}")
-    print("\nRun `jobagent schedule --install` to set it up, or do it yourself with:\n")
+        print(f"  {at}  {'Mondays' if freq == 'WEEKLY' else 'daily  '}  jobstream {args:<16} {why}")
+    print("\nRun `jobstream schedule --install` to set it up, or do it yourself with:\n")
     if kind == "cron":
         print("  crontab -e   # then add:")
     for l in lines:
@@ -548,7 +548,7 @@ def cmd_followups(a):
     for d in due:
         print(f"[{d['id']}] {d['due']}  {d['company']} / {d['title']}: {d['message']}")
     if due:
-        print("\nMark one done with `jobagent followups --done <id>`. Messages are in each application's networking.md.")
+        print("\nMark one done with `jobstream followups --done <id>`. Messages are in each application's networking.md.")
 
 
 def cmd_insights(a):
@@ -582,7 +582,7 @@ def cmd_run(a):
 
 # ---------------------------------------------------------------------------- parser
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="jobagent", description="Your personal UK tech job-search agent.")
+    p = argparse.ArgumentParser(prog="jobstream", description="JobStream: your personal UK tech job-search agent.")
     p.add_argument("-v", "--verbose", action="store_true")
     sub = p.add_subparsers(dest="cmd", required=True)
 

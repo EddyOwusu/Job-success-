@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 
-from jobagent.matching import detect_level, quick_title_filter, score_job
-from jobagent.models import Job
-from jobagent.skills import extract_skills, extract_weighted
-from jobagent.sources.base import is_uk
-from jobagent.sponsors import Sponsor
+from jobstream.matching import detect_level, quick_title_filter, score_job
+from jobstream.models import Job
+from jobstream.skills import extract_skills, extract_weighted
+from jobstream.sources.base import is_uk
+from jobstream.sponsors import Sponsor
 
 SP = Sponsor("Acme Ltd", "London", "", "Worker (A rating)", "Skilled Worker")
 DESC = """About the role

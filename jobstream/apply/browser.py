@@ -122,7 +122,7 @@ def fill_form(url: str, ctx, pack, answer_fn: Callable[[list[dict]], dict[str, t
     with sync_playwright() as pw:
         # dry: fill in a hidden browser and screenshot, never submit (for testing)
         launch = {"headless": (headless and mode == "auto") or mode == "dry"}
-        chromium_path = chromium_path or os.environ.get("JOBAGENT_CHROMIUM_PATH", "")
+        chromium_path = chromium_path or os.environ.get("JOBSTREAM_CHROMIUM_PATH", "")
         if chromium_path:
             launch["executable_path"] = chromium_path
         if hasattr(os, "geteuid") and os.geteuid() == 0:

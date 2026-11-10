@@ -1,4 +1,4 @@
-from jobagent.sponsors import from_csv_text
+from jobstream.sponsors import from_csv_text
 
 CSV = """Organisation Name,Town/City,County,Type & Rating,Route
 Monzo Bank Ltd,London,,Worker (A rating),Skilled Worker
@@ -34,7 +34,7 @@ def test_unknown_and_other_routes():
 
 
 def test_aliases():
-    from jobagent.sponsors import SponsorRegister
+    from jobstream.sponsors import SponsorRegister
     import csv, io
     reg = SponsorRegister(csv.DictReader(io.StringIO(CSV)), aliases={"Meta": "Facebook UK"})
     assert reg.match("Meta").name == "Facebook UK"

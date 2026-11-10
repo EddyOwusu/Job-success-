@@ -1,6 +1,6 @@
 """Speed alerts: tell you about excellent, freshly posted jobs while applying early still matters.
 
-Recruiters often start screening within days, so the first 48 hours count. `jobagent watch`
+Recruiters often start screening within days, so the first 48 hours count. `jobstream watch`
 is a quick search (a minute or two, because known adverts are skipped) that you schedule a
 few times a day. When a new job clears the bar it pushes "Apply today" to your phone.
 """
@@ -56,7 +56,7 @@ def describe(r) -> tuple[str, str]:
     b = json.loads(r["score_json"] or "{}")
     bits.append("Scale-up sponsor" if b.get("scaleup") else "licensed sponsor" if r["sponsor_match"] else "check sponsorship")
     title = f"Apply today: {r['title']} at {r['company']}"
-    body = " · ".join(bits) + f"\njobagent apply {r['uid']}"
+    body = " · ".join(bits) + f"\njobstream apply {r['uid']}"
     return title, body
 
 

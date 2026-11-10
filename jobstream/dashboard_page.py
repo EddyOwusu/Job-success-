@@ -283,7 +283,7 @@ const decided = (n('interview') + n('offer')) + closed;
 
 const T = $('#todo'), KIND = {apply: ['Apply', 'blue'], follow: ['Follow up', 'amber'], interview: ['Interview', 'green'], send: ['Send', 'grey']};
 $('#todo-ct').textContent = D.todo.length ? D.todo.length + ' to do' : '';
-if (!D.todo.length) T.replaceWith(el('p', 'empty', 'Nothing urgent. Run “jobagent watch” to check for fresh jobs.'));
+if (!D.todo.length) T.replaceWith(el('p', 'empty', 'Nothing urgent. Run “jobstream watch” to check for fresh jobs.'));
 D.todo.forEach(t => { const li = el('li'), w = el('div', 't'), k = KIND[t.kind] || [t.kind, 'grey'];
   const p = el('p'); p.append(link(t.text.replace(/^(Apply today|Follow up|Interview): /, ''), t.url)); w.append(badge(k[0], k[1]), p); li.append(w, cmd(t.cmd)); T.append(li); });
 
@@ -319,7 +319,7 @@ function drawJobs(){
   const rows = D.shortlist.filter(j => (sector === 'all' || j.sector === sector) && (!query || (j.title + ' ' + j.company + ' ' + j.matched.join(' ')).toLowerCase().includes(query)))
     .sort((a, b) => sortDir * (val[sortKey](a) - val[sortKey](b)));
   $('#sl-sub').textContent = rows.length + (rows.length === 1 ? ' job' : ' jobs') + ' at employers that can sponsor you, best match first';
-  $('#sl-empty').hidden = rows.length > 0; $('#sl-empty').textContent = D.shortlist.length ? 'No jobs match that filter.' : 'No jobs yet. Run “jobagent run” to search.';
+  $('#sl-empty').hidden = rows.length > 0; $('#sl-empty').textContent = D.shortlist.length ? 'No jobs match that filter.' : 'No jobs yet. Run “jobstream run” to search.';
   rows.slice(0, limit).forEach(j => { const tr = el('tr');
     const role = el('td', 'role'), t = el('div'); t.append(link(j.title, j.url)); role.append(t, el('div', 'm', [j.company, SECT[j.sector] || j.sector, j.location].filter(Boolean).join(' · ')));
     role.title = [j.company, j.location].filter(Boolean).join(' · ');
@@ -331,7 +331,7 @@ function drawJobs(){
     box.append(el('b', null, String(scv)), tk); box.title = (j.fit != null ? 'Claude fit ' : 'Keyword score ') + scv + ' out of 100'; sc.append(box);
     const st = el('td', 'hide-m'); st.append(j.status === 'packed' ? badge('Pack ready', 'blue') : badge('Shortlisted', 'grey'));
     if (j.status === 'packed') { const b2 = badge('Pack ready', 'blue'); b2.classList.add('only-m'); role.querySelector('div').append(document.createTextNode(' '), b2); }
-    const act = el('td', 'r full'); act.append(cmd('jobagent apply ' + short(j.uid)));
+    const act = el('td', 'r full'); act.append(cmd('jobstream apply ' + short(j.uid)));
     tr.append(role, sp, sal, posted, sc, st, act); body.append(tr); });
   const more = $('#sl-more'); more.hidden = rows.length <= limit; more.textContent = 'Show ' + Math.min(20, rows.length - limit) + ' more';
 }
@@ -353,7 +353,7 @@ function drawApps(){
     const s = STATUS[j.status] || [j.status, 'grey'], st = el('td'); st.append(badge(s[0], s[1]));
     const next = el('td', 'hide-m', j.status === 'interview' ? 'Read your prep pack' : j.status === 'offer' ? 'Confirm sponsorship route and salary' : j.status === 'applied' ? (j.applied_days >= 4 ? 'Send a follow-up' : 'Wait, and send the networking messages') : '–');
     if (next.textContent === '–') next.classList.add('muted');
-    const act = el('td', 'r full'); act.append(cmd(j.status === 'interview' ? 'jobagent prep ' + short(j.uid) : 'jobagent show ' + short(j.uid)));
+    const act = el('td', 'r full'); act.append(cmd(j.status === 'interview' ? 'jobstream prep ' + short(j.uid) : 'jobstream show ' + short(j.uid)));
     tr.append(role, when, st, next, act); body.append(tr); });
 }
 drawApps();
@@ -369,7 +369,7 @@ const G = $('#gaps');
 if (!D.gaps.length) G.append(el('p', 'empty', 'Shows the skills your near-miss jobs ask for, once there are enough jobs.'));
 else { const gm = Math.max(...D.gaps.map(g => g.share)), w = el('div', 'bars');
   D.gaps.forEach(g => w.append(bar(g.skill + (g.status ? ' (planned)' : ''), g.share, gm, Math.round(100 * g.share) + '%', 'Asked for by ' + g.employers.join(', ') + (g.unlocks ? ' · would unlock ' + g.unlocks + ' near-miss jobs' : ''))));
-  G.append(w, el('p', 'cap', 'Share of ' + D.gap_pool + ' near-match jobs asking for a skill you have not listed.')); const d = el('p'); d.style.marginTop = '12px'; d.append(cmd('jobagent grow --plan')); G.append(d); }
+  G.append(w, el('p', 'cap', 'Share of ' + D.gap_pool + ' near-match jobs asking for a skill you have not listed.')); const d = el('p'); d.style.marginTop = '12px'; d.append(cmd('jobstream grow --plan')); G.append(d); }
 const B2 = $('#blockers2'); bl.forEach(([k, v]) => B2.append(bar(k, v, bmax, num(v), v + ' jobs', true))); if (!bl.length) B2.append(el('p', 'empty', 'Nothing filtered out yet.'));
 
 // ---------- system
@@ -379,7 +379,7 @@ D.health.forEach(s => { const r = el('div'), right = el('span', 'rt'), st = STAT
   right.append(el('span', null, (s.boards != null ? s.boards + ' boards · ' : '') + num(s.seen) + ' postings'), badge(st[0], st[1])); r.append(el('span', null, s.name), right);
   if (s.detail && (s.state === 'broken' || s.state === 'warn')) r.append(el('span', 'd', s.detail)); H.append(r); });
 const V = $('#routes'), RS = {likely: ['Likely', 'green'], possible: ['Possible', 'blue'], check: ['Worth checking', 'grey'], unlikely: ['Unlikely', 'grey'], not_eligible: ['Not eligible', 'grey']};
-if (!D.routes.length) V.append(el('p', 'empty', 'Run “jobagent visa” to check which routes are open to you.'));
+if (!D.routes.length) V.append(el('p', 'empty', 'Run “jobstream visa” to check which routes are open to you.'));
 D.routes.forEach(r => { const d = el('div'), st = RS[r.status] || [r.status, 'grey']; d.append(link(r.name, r.link), badge(st[0], st[1])); V.append(d); });
 [['Visa route', D.visa_route], ['Salary floor', '£' + num(D.threshold)], ['Licensed sponsors on the register', D.sponsor_count ? num(D.sponsor_count) : 'not loaded'],
  ['Newly licensed in the last 14 days', num(D.radar.count)], ['Company job boards searched', num(D.radar.boards)]]
@@ -399,7 +399,7 @@ BODY = """
   <main>
     <section class="view" id="v-overview">
       <div class="ph"><div><h1>Overview</h1><p id="ov-sub"></p></div><div id="ov-health"></div></div>
-      <p class="notice" id="notice" hidden>Showing the example profile. Run <code>jobagent init</code> and fill in your details.</p>
+      <p class="notice" id="notice" hidden>Showing the example profile. Run <code>jobstream init</code> and fill in your details.</p>
       <dl class="card metrics" id="metrics"></dl>
       <div class="cols">
         <div class="stack">

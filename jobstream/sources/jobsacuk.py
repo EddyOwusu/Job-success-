@@ -17,7 +17,7 @@ from ..visa import parse_salary
 from .base import abroad, work_mode
 
 BASE = "https://www.jobs.ac.uk"
-HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; jobagent personal job search)"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; jobstream personal job search)"}
 
 
 def available() -> bool:

@@ -1,9 +1,9 @@
-from jobagent.cli import parse_board_url
-from jobagent.models import Job
-from jobagent.sources.nhs import _salary
-from jobagent.tailor import needs_statement
-from jobagent.visa import sponsorship_signal
-from jobagent.matching import quick_title_filter
+from jobstream.cli import parse_board_url
+from jobstream.models import Job
+from jobstream.sources.nhs import _salary
+from jobstream.tailor import needs_statement
+from jobstream.visa import sponsorship_signal
+from jobstream.matching import quick_title_filter
 
 
 def test_nhs_salary():
@@ -42,7 +42,7 @@ def test_non_tech_titles(profile):
 
 
 def test_abroad_filter():
-    from jobagent.sources.base import abroad
+    from jobstream.sources.base import abroad
     assert abroad("Dubai Emirates Aviation University")
     assert abroad("Ningbo, China University of Nottingham")
     assert not abroad("Rotherham, Hybrid")

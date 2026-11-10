@@ -1,12 +1,12 @@
 import json
 from datetime import date, datetime, timedelta, timezone
 
-from jobagent import alerts, schedule, speculative, visa_routes
-from jobagent.config import Context
-from jobagent.db import DB
-from jobagent.matching import score_job
-from jobagent.models import Job
-from jobagent.sponsors import from_csv_text
+from jobstream import alerts, schedule, speculative, visa_routes
+from jobstream.config import Context
+from jobstream.db import DB
+from jobstream.matching import score_job
+from jobstream.models import Job
+from jobstream.sponsors import from_csv_text
 
 CSV = """Organisation Name,Town/City,County,Type & Rating,Route
 Rocket Labs Ltd,London,,Worker (A rating),Scale-up

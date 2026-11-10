@@ -296,7 +296,7 @@ def approach_markdown(t: Target, a: SpeculativeApproach, links, patterns, contac
     o += ["", "## LinkedIn connection note", "", a.linkedin_note, "", "## Email", "",
           f"**Subject:** {a.email_subject}", "", a.email_body, "", "## Follow-up (after 7 days)", "", a.follow_up,
           "", "## Before you send", ""] + [f"- {x}" for x in a.tips]
-    o += ["", f"When you've sent it, run: `jobagent speculative --sent \"{t.company}\"`"]
+    o += ["", f"When you've sent it, run: `jobstream speculative --sent \"{t.company}\"`"]
     if research_md:
         o += ["", "## Research notes", "", research_md]
     if sources:

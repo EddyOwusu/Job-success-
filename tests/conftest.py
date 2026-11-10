@@ -7,8 +7,8 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from jobagent.config import DEFAULT_SETTINGS  # noqa: E402
-from jobagent.models import MasterCV, Profile  # noqa: E402
+from jobstream.config import DEFAULT_SETTINGS  # noqa: E402
+from jobstream.models import MasterCV, Profile  # noqa: E402
 
 
 @pytest.fixture

@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jobagent"
+name = "jobstream"
 version = "0.1.0"
 description = "A personal job-search agent that finds UK tech roles with visa sponsorship, tailors your CV, applies, and plans your networking."
 requires-python = ">=3.10"
@@ -22,10 +22,10 @@ apply = ["playwright>=1.45"]
 dev = ["pytest>=8"]
 
 [project.scripts]
-jobagent = "jobagent.cli:main"
+jobstream = "jobstream.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["jobagent*"]
+include = ["jobstream*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,6 +1,6 @@
-from jobagent.db import DB
-from jobagent.models import CoverLetter, Job, TailoredCV, TailoredRole
-from jobagent import render
+from jobstream.db import DB
+from jobstream.models import CoverLetter, Job, TailoredCV, TailoredRole
+from jobstream import render
 
 
 def test_dedupe_across_sources(tmp_path):
@@ -26,6 +26,6 @@ def test_render_files(tmp_path, profile):
 
 
 def test_cli_parser():
-    from jobagent.cli import build_parser
+    from jobstream.cli import build_parser
     args = build_parser().parse_args(["apply", "--top", "3", "--mode", "review"])
     assert args.top == 3 and args.mode == "review"

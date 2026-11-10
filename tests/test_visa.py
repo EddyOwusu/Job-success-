@@ -1,6 +1,6 @@
 import pytest
 
-from jobagent.visa import clearance_required, parse_salary, salary_check, sponsorship_signal
+from jobstream.visa import clearance_required, parse_salary, salary_check, sponsorship_signal
 
 
 @pytest.mark.parametrize("text,label", [
