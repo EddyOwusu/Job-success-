@@ -149,31 +149,75 @@ def canonical(skill: str) -> str:
     return skill.strip()
 
 
-def extract_skills(text: str) -> set[str]:
+@lru_cache(maxsize=1)
+def _matcher():
+    """One combined pattern for every plain alias (a single pass over the text), plus the few
+    special patterns (Go, R, C) that need their own context checks."""
+    literal: dict[str, str] = {}
+    special: list[tuple[str, re.Pattern]] = []
+    for canon, aliases in TAXONOMY.items():
+        extra = [] if canon in AMBIGUOUS else [canon.lower()]
+        for a in aliases + extra:
+            if a.startswith("\\b") or "(?=" in a:
+                special.append((canon, re.compile(a, re.I)))
+            else:
+                literal.setdefault(a, canon)
+    alts = sorted(literal, key=len, reverse=True)          # longest first: "react native" before "react"
+    big = re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(a) for a in alts) + r")(?![a-z0-9+#])")
+    return big, literal, special
+
+
+def find_skills(text: str) -> list[tuple[int, str]]:
+    """(position, canonical skill) for every skill mention in the text."""
     text = text or ""
-    return {canon for canon, pat in _compiled() if pat.search(text)}
+    big, literal, special = _matcher()
+    out: list[tuple[int, str]] = []
+    for m in big.finditer(text.lower()):
+        alias = m.group(1)
+        out.append((m.start(), literal[alias]))
+        if " " in alias:                                   # "ruby on rails" also means Ruby
+            for word in alias.split():
+                if word in literal and literal[word] != literal[alias]:
+                    out.append((m.start(), literal[word]))
+    for canon, pat in special:
+        out += [(m.start(), canon) for m in pat.finditer(text)]
+    return out
+
+
+def extract_skills(text: str) -> set[str]:
+    return {canon for _, canon in find_skills(text)}
 
 
 def extract_weighted(text: str) -> dict[str, float]:
     """Skills in the advert with a weight: 1.0 required, 0.4 nice-to-have, 0.7 unknown section,
     0.3 for the intro before the requirements (usually the company describing itself)."""
-    weights: dict[str, float] = {}
-    lines = (text or "").splitlines()
+    text = text or ""
+    found = find_skills(text)
+    if not found:
+        return {}
+    from bisect import bisect_right
+
+    lines = text.split("\n")
     has_sections = any(len(l.strip()) < 80 and not l.strip().startswith("-") and REQUIRED_HEADERS.search(l)
                        for l in lines[1:])
     section_weight = 0.3 if has_sections else 0.7
+    starts, line_weights, offset = [], [], 0
     for n, line in enumerate(lines):
+        starts.append(offset)
+        offset += len(line) + 1
         stripped = line.strip()
         if n == 0 and has_sections:      # the job title always counts in full
-            for skill in extract_skills(stripped):
-                weights[skill] = 1.0
+            line_weights.append(1.0)
             continue
         is_header = len(stripped) < 80 and not stripped.startswith("-")
         if is_header and NICE_TO_HAVE_HEADERS.search(stripped):
             section_weight = 0.4
         elif is_header and REQUIRED_HEADERS.search(stripped):
             section_weight = 1.0
-        line_weight = 0.4 if NICE_TO_HAVE_HEADERS.search(stripped) else section_weight
-        for skill in extract_skills(stripped):
-            weights[skill] = max(weights.get(skill, 0), line_weight)
+        line_weights.append(0.4 if NICE_TO_HAVE_HEADERS.search(stripped) else section_weight)
+    weights: dict[str, float] = {}
+    for pos, skill in found:
+        w = line_weights[bisect_right(starts, pos) - 1]
+        if w > weights.get(skill, 0):
+            weights[skill] = w
     return weights

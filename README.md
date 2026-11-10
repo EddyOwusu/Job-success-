@@ -62,6 +62,12 @@
      you qualify for routes beyond standard sponsorship: the HPI visa (no sponsor
      needed), the Scale-up visa (free to move after 6 months), the new-entrant salary
      rate and nationality-based schemes. Jobs at Scale-up sponsors are marked.
+   - **Skill gaps into projects.** `jobagent grow` shows which missing skills cost you the
+     most near-miss jobs and writes a two-week portfolio project plan for the top one.
+   - **Dashboard.** One page with today's actions, your shortlist, pipeline, results
+     and source health, on your PC or on your phone over home Wi-Fi.
+   - **Source health.** Every run records what each job site returned. If one silently
+     stops working, you get a warning instead of a quiet gap in your search.
 8. **Announces what matters.** A daily digest (Markdown, email, phone push) shows
    the best new matches and suggestions such as: *"Terraform appears in 38% of your
    best matches"*, *"Add 'Platform Engineer' to your targets: 12 jobs fit your
@@ -115,6 +121,9 @@ leave your machine, apart from the job and CV text sent to the Claude API.
 | `jobagent speculative` | Sponsors worth approaching without a vacancy; `--build 3` drafts the notes and CVs |
 | `jobagent visa` | Which visa routes are open to you, checked on gov.uk |
 | `jobagent list --scaleup` | Open jobs at Scale-up sponsors |
+| `jobagent dashboard --open` | The dashboard in your browser (`--lan` to read it on your phone) |
+| `jobagent grow` | Your skill gaps; `--plan` writes a two-week project plan for the top one |
+| `jobagent health` | Is every job source still working? |
 | `jobagent learn` | What's working: interview rates by sector, source, score, advert age, networking |
 | `jobagent insights` | The agent's suggestions |
 | `jobagent sponsors --check "Monzo" "Revolut"` | Is a company a licensed sponsor? |
@@ -266,6 +275,34 @@ stored aren't downloaded again.
 If a route with no sponsor requirement looks likely, it appears at the top of your digest.
 This is a pointer to the right gov.uk pages, not immigration advice.
 
+## Dashboard, skill projects and source health
+
+**Dashboard (`jobagent dashboard`).** Rebuilt as `output/dashboard.html` after every run:
+a single file that opens without internet. It shows what to do today (with the command for
+each action; tap to copy), suggestions, the shortlist with sector filters and search, your
+pipeline, what was filtered out and why, applications and their status, interview rates,
+skill gaps, source health, visa routes and the sponsor radar. `--open` opens it; `--serve`
+serves a live copy at `http://127.0.0.1:8765`; `--lan` also makes it reachable from your
+phone on the same Wi-Fi, behind a random address printed when it starts. The page is
+read-only: nothing on it can change or submit anything.
+
+**Skill projects (`jobagent grow`).** For each skill missing from your profile it shows
+the share of your near-match jobs that ask for it, how often it's a hard requirement, which
+employers ask, and how many near-miss jobs would reach your shortlist with it. Skills only
+named in a company's intro paragraph are ignored. `--plan [skill]` writes
+`output/projects/<skill>.md`: a specific project that builds on what you already know, a
+two-week plan, what "done" means, what to publish, CV bullet templates (with placeholders
+for results you must measure) and interview talking points. `--start`, `--done` and
+`--drop` track it. `--done` shows exactly what to paste into your profile and master CV;
+the agent never adds a skill for you.
+
+**Source health (`jobagent health`).** A source is flagged when it returns nothing but
+used to return results, when every search errors, when 40% or more of one system's company
+boards go empty at once, when one board is empty for three runs (it may have moved), or
+when adverts come back without their text (the page layout changed). Broken sources go to
+the top of the digest and trigger a push. If every source fails at once, it's reported
+once as "the computer was offline".
+
 ## NHS, universities and other non-tech employers
 
 - **Supporting statements.** NHS trusts and universities shortlist by scoring a
@@ -363,6 +400,9 @@ jobagent/
   speculative.py    ranks sponsors without a fitting vacancy; drafts approach packs
   alerts.py         "apply today" pushes; schedule.py sets up Task Scheduler / cron
   visa_routes.py    HPI, Scale-up, new-entrant and other routes, checked on gov.uk
+  growth.py         skill gaps and two-week project plans
+  dashboard.py      the one-page dashboard and its read-only server
+  health.py         per-source run history and breakage detection
 config/             example profile and master CV (copy them with `jobagent init`)
 data/seed_companies.yaml   starting list of employers' job boards
 tests/              pytest suite (run: python -m pytest)

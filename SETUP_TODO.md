@@ -58,6 +58,7 @@ Nothing here contains personal data, so it is safe in the repository.
 - [ ] `jobagent visa`: which visa routes are open to you (HPI, Scale-up, new-entrant rate), checked on gov.uk
 - [ ] `jobagent discover`: finds more sponsor job boards (takes a few minutes)
 - [ ] `jobagent run --mode pack`: first full run (about 10 minutes the first time, 1-2 minutes after)
+- [ ] `jobagent dashboard --open`: everything on one page
 - [ ] `jobagent list`, then `jobagent show <id>` on the top few
 - [ ] `jobagent apply <id> --mode dry` once, to see a filled form without submitting
 - [ ] `jobagent apply --top 3`: check each form, press Submit yourself
@@ -78,11 +79,15 @@ Nothing here contains personal data, so it is safe in the repository.
 
 ## 8. Weekly habits
 
-- [ ] Daily, 2 min: read the push and digest
+- [ ] Daily, 2 min: read the push and digest, or open the dashboard
+      (`jobagent dashboard --lan` shows it on your phone over home Wi-Fi)
 - [ ] Daily, 15 min: `jobagent apply --top 5`, check and submit
 - [ ] Daily, 10 min: send the networking messages; `jobagent followups`
 - [ ] Weekly: `jobagent speculative`, then `--build 3`, send them, `--sent "<company>"`
 - [ ] Weekly: `jobagent learn` (what's working) and `jobagent radar` (newly licensed sponsors)
+- [ ] Weekly: `jobagent grow`. If a skill keeps costing you jobs, `--plan` a two-week project for it,
+      build it, then `--done "<skill>"` and paste the snippet into your profile and master CV
+- [ ] If the digest says a source "looks broken": run `jobagent health` and pull the latest code
 - [ ] When you get an interview: `jobagent status <id> interview` (builds your prep pack)
 
 ## 9. Check these facts yourself

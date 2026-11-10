@@ -81,8 +81,9 @@ def test_generic_words_are_not_skills():
 def seed_jobs(db, n=12):
     for i in range(n):
         desc = "Requirements\n- Python, Django\n- Kubernetes in production\n" + ("Nice to have\n- Terraform\n" if i % 2 else "")
-        j = Job(source="greenhouse", source_id=str(i), company=f"Co{i % 4}", title="Backend Engineer", location="London",
-                description=desc)
+        # distinct titles: identical company + title + location would be merged as one advert
+        j = Job(source="greenhouse", source_id=str(i), company=f"Co{i % 4}", title=f"Backend Engineer, Team {i}",
+                location="London", description=desc)
         db.upsert_job(j, "X Ltd")
         db.conn.execute("UPDATE jobs SET score=?, score_json=?, status='new' WHERE uid=?",
                         (55 if i < 6 else 70, json.dumps({"title": 1.0, "blockers": [], "notes": []}), j.uid))
