@@ -16,7 +16,7 @@ def board_exists(token: str) -> int:
 
 
 def fetch(token: str, company: str | None = None, uk_only: bool = True, detail_limit: int = 60,
-          want=None, known: set | None = None) -> list[Job]:
+          want=None, known: set | None = None, stats: dict | None = None) -> list[Job]:
     """`want(title) -> bool` skips irrelevant titles before the (slow) detail request."""
     params = {"limit": 100, "offset": 0}
     if uk_only:
@@ -25,6 +25,8 @@ def fetch(token: str, company: str | None = None, uk_only: bool = True, detail_l
     while True:
         data = get_json(API.format(token=token), params=params) or {}
         content = data.get("content", [])
+        if stats is not None:
+            stats["seen"] = stats.get("seen", 0) + len(content)
         for j in content:
             if want and not want(j.get("name", "")):
                 continue

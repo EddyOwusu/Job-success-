@@ -15,13 +15,15 @@ def available() -> bool:
 
 
 def search(query: str, location: str = "", max_results: int = 100, details: int = 40, want=None,
-           known: set | None = None) -> list[Job]:
+           known: set | None = None, stats: dict | None = None) -> list[Job]:
     auth = (os.environ["REED_API_KEY"], "")
     params = {"keywords": query, "resultsToTake": min(max_results, 100)}
     if location and "remote" not in location.lower():
         params.update(locationName=location, distanceFromLocation=15)
     data = get_json(f"{API}/search", params=params, auth=auth, min_interval=0.5) or {}
     jobs = []
+    if stats is not None:
+        stats["seen"] = stats.get("seen", 0) + len(data.get("results", []))
     results = [r for r in data.get("results", []) if not (known and str(r["jobId"]) in known)
                and not (want and not want(r.get("jobTitle", "")))]
     for i, r in enumerate(results):

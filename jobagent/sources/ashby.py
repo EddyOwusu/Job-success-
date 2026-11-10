@@ -19,9 +19,11 @@ def _addr(a) -> str:
     return ", ".join(x for x in (pa.get("addressLocality"), pa.get("addressRegion"), pa.get("addressCountry")) if x)
 
 
-def fetch(token: str, company: str | None = None, uk_only: bool = True) -> list[Job]:
+def fetch(token: str, company: str | None = None, uk_only: bool = True, stats: dict | None = None) -> list[Job]:
     data = get_json(API.format(token=token), params={"includeCompensation": "true"})
     jobs = []
+    if stats is not None:
+        stats["seen"] = len((data or {}).get("jobs", []))
     for j in (data or {}).get("jobs", []):
         if j.get("isListed") is False:
             continue

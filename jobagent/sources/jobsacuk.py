@@ -33,7 +33,7 @@ def advert(url: str) -> str:
 
 
 def search(query: str, location: str = "", pages: int = 1, details: int = 20, want=None,
-           known: set | None = None) -> list[Job]:
+           known: set | None = None, stats: dict | None = None) -> list[Job]:
     jobs: list[Job] = []
     detailed = 0
     for page in range(pages):
@@ -45,6 +45,8 @@ def search(query: str, location: str = "", pages: int = 1, details: int = 20, wa
             break
         s = BeautifulSoup(r.text, "html.parser")
         results = s.select(".j-search-result__result")
+        if stats is not None:
+            stats["seen"] = stats.get("seen", 0) + len(results)
         for res in results:
             a = res.select_one(".j-search-result__text a")
             if not a:

@@ -297,6 +297,81 @@ def cmd_prep(a):
     print(f"Interview prep ({summary_line(path)}): {path}")
 
 
+def cmd_dashboard(a):
+    ctx, db = _ctx_db()
+    from . import dashboard
+
+    path = dashboard.build(db, ctx)
+    if not (a.serve or a.lan):
+        print(f"Dashboard written: {path}")
+        if a.open:
+            import webbrowser
+            webbrowser.open(path.as_uri())
+        else:
+            print("Open that file in your browser, or run `jobagent dashboard --open`.\n"
+                  "To read it on your phone: `jobagent dashboard --lan` (same Wi-Fi).")
+        return
+
+    def page():
+        fresh = DB(DB_PATH)          # each request reads the latest data
+        try:
+            return dashboard.render(dashboard.collect(fresh, ctx))
+        finally:
+            fresh.conn.close()
+
+    server = dashboard.serve(page, port=a.port, lan=a.lan)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopped.")
+
+
+def cmd_grow(a):
+    ctx, db = _ctx_db()
+    from . import growth
+
+    for flag, status in ((a.start, "in_progress"), (a.done, "done"), (a.drop, "dropped")):
+        if flag:
+            skill = growth.set_status(db, flag, status)
+            if not skill:
+                print(f"No project planned for '{flag}'. Plan one with `jobagent grow --plan \"{flag}\"`.")
+                return 1
+            print(f"{skill} -> {status}")
+            if status == "done":
+                print("\n" + growth.done_snippet(skill))
+            return
+    gap_list, pool = growth.gaps(db, ctx)
+    if not gap_list:
+        print(f"Not enough data yet ({pool} near-match jobs; need {growth.MIN_JOBS}). Run `jobagent search` first.")
+        return
+    if a.plan is not None:
+        want = a.plan.lower()
+        g = next((g for g in gap_list if g.skill.lower() == want), None) if want else next(
+            (g for g in gap_list if not g.status), gap_list[0])
+        if not g:
+            print(f"'{a.plan}' isn't one of your current gaps. Gaps: " + ", ".join(x.skill for x in gap_list))
+            return 1
+        print(f"Planning a project for {g.skill}...")
+        path = growth.plan(db, ctx, _llm(ctx), g)
+        print(f"Plan written: {path}\nStart it with `jobagent grow --start \"{g.skill}\"`.")
+        return
+    print(f"Skills missing from your profile, across {pool} jobs you nearly match:\n")
+    print(f"  {'skill':<18}{'asked in':>9}{'required':>10}{'unlocks':>9}   employers")
+    for g in gap_list:
+        tag = f"  [{g.status.replace('_', ' ')}]" if g.status else ""
+        print(f"  {g.skill:<18}{g.share:>8.0%}{g.required_share:>10.0%}{g.unlocks:>9}   {', '.join(g.employers[:4])}{tag}")
+    print("\n'unlocks' = near-miss jobs that would reach your shortlist with that skill.")
+    print("Plan a two-week project for the top one with `jobagent grow --plan`, or name one: --plan Kubernetes.")
+    print("Already have one of these? Add it to config/profile.yaml instead.")
+
+
+def cmd_health(a):
+    ctx, db = _ctx_db()
+    from . import health
+
+    print(health.report(db))
+
+
 def cmd_speculative(a):
     ctx, db = _ctx_db()
     from . import speculative
@@ -377,6 +452,8 @@ def cmd_visa(a):
     reg = load_register(ctx)
     routes = visa_routes.check(ctx.profile, ctx.settings, CACHE_DIR,
                                scaleup_count=len(reg.scaleup.sponsors) if reg.scaleup else 0)
+    db.set_learned("visa_routes", [{"name": r.name, "status": r.status, "summary": r.summary, "link": r.link}
+                                   for r in routes])
     md = visa_routes.report_markdown(routes)
     path = OUTPUT_DIR / "reports" / "visa-routes.md"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -557,6 +634,19 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--interviewers", help="names and roles, if you know them")
     s.add_argument("--notes", help="anything they told you about the interview")
     s.set_defaults(fn=cmd_prep)
+    s = sub.add_parser("dashboard", help="one page with today's actions, shortlist, pipeline, results and source health")
+    s.add_argument("--open", action="store_true", help="open it in your browser")
+    s.add_argument("--serve", action="store_true", help="serve it live on this computer (refresh to update)")
+    s.add_argument("--lan", action="store_true", help="also reachable from your phone on the same Wi-Fi")
+    s.add_argument("--port", type=int, default=8765)
+    s.set_defaults(fn=cmd_dashboard)
+    s = sub.add_parser("grow", help="your skill gaps, and two-week project plans that close them")
+    s.add_argument("--plan", nargs="?", const="", metavar="SKILL", help="write a project plan (top gap if no skill given)")
+    s.add_argument("--start", metavar="SKILL")
+    s.add_argument("--done", metavar="SKILL", help="finished: shows what to add to your profile and master CV")
+    s.add_argument("--drop", metavar="SKILL")
+    s.set_defaults(fn=cmd_grow)
+    sub.add_parser("health", help="is every job source still working?").set_defaults(fn=cmd_health)
     s = sub.add_parser("speculative", help="sponsors worth approaching without a vacancy; drafts the note and CV")
     s.add_argument("--build", type=int, metavar="N", help="draft approach packs for the top N")
     s.add_argument("--limit", type=int, default=10)

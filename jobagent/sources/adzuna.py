@@ -15,7 +15,7 @@ def available() -> bool:
 
 
 def search(query: str, location: str = "", pages: int = 2, max_days_old: int = 30, want=None,
-           known: set | None = None) -> list[Job]:
+           known: set | None = None, stats: dict | None = None) -> list[Job]:
     jobs = []
     for page in range(1, pages + 1):
         params = {
@@ -27,6 +27,8 @@ def search(query: str, location: str = "", pages: int = 2, max_days_old: int = 3
             params["where"] = location
         data = get_json(API.format(page=page), params=params, min_interval=1.0) or {}
         results = data.get("results", [])
+        if stats is not None:
+            stats["seen"] = stats.get("seen", 0) + len(results)
         for r in results:
             loc = (r.get("location") or {}).get("display_name", "")
             jobs.append(Job(

@@ -39,13 +39,16 @@ def board_exists(token: str) -> int:
 
 
 def fetch(token: str, company: str | None = None, uk_only: bool = True, want=None,
-          queries: list[str] | None = None, details: int = 40, known: set | None = None) -> list[Job]:
+          queries: list[str] | None = None, details: int = 40, known: set | None = None,
+          stats: dict | None = None) -> list[Job]:
     """`known`: advert paths already stored (extra["path"]); skipped before the slow detail request."""
     api, host = _api(token)
     seen, postings = set(), []
     for q in (queries or ["software engineer", "developer", "data engineer"])[:6]:
         for offset in (0, 20):
             data = _search(token, q, 20, offset)
+            if stats is not None:
+                stats["seen"] = max(stats.get("seen", 0), int(data.get("total") or 0))
             for p in data.get("jobPostings", []):
                 if p.get("externalPath") in seen:
                     continue

@@ -15,9 +15,11 @@ def board_exists(token: str) -> int:
     return len((data or {}).get("jobs", [])) if data else -1
 
 
-def fetch(token: str, company: str | None = None, uk_only: bool = True) -> list[Job]:
+def fetch(token: str, company: str | None = None, uk_only: bool = True, stats: dict | None = None) -> list[Job]:
     data = get_json(API.format(token=token), params={"content": "true"})
     jobs = []
+    if stats is not None:
+        stats["seen"] = len((data or {}).get("jobs", []))
     for j in (data or {}).get("jobs", []):
         loc = (j.get("location") or {}).get("name", "") or ""
         offices = ", ".join(o.get("name", "") for o in j.get("offices", []) or [])

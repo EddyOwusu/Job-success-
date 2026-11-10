@@ -74,6 +74,17 @@ CREATE TABLE IF NOT EXISTS inbox_seen (
     msg_id TEXT PRIMARY KEY, at TEXT, job_uid TEXT, verdict TEXT
 );
 
+-- What each source returned on each run, to notice when one breaks
+CREATE TABLE IF NOT EXISTS source_runs (
+    run_at TEXT, kind TEXT, key TEXT, seen INTEGER, returned INTEGER, empty_desc INTEGER, error TEXT
+);
+CREATE INDEX IF NOT EXISTS source_runs_kind ON source_runs(kind, key, run_at);
+
+CREATE TABLE IF NOT EXISTS projects (
+    skill TEXT PRIMARY KEY, status TEXT DEFAULT 'planned',   -- planned | in_progress | done | dropped
+    created_at TEXT, done_at TEXT, plan_path TEXT, demand REAL
+);
+
 -- Speculative approaches to sponsors with no suitable vacancy right now
 CREATE TABLE IF NOT EXISTS speculative (
     company TEXT PRIMARY KEY, sponsor_name TEXT, score REAL, reasons TEXT,

@@ -62,25 +62,35 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
             if path:
                 known.setdefault("workday_paths", set()).add(path)
 
+    from . import health
+    run_at = health.new_run()
+
     def fetch_board(b):
         mod = ATS[b["ats"]]
-        if b["ats"] == "smartrecruiters":
-            return b, mod.fetch(b["token"], b["company"], uk_only=uk_only, want=want,
-                                known=known.get("smartrecruiters"))
-        if b["ats"] == "workday":
-            return b, mod.fetch(b["token"], b["company"], uk_only=uk_only, want=want,
-                                queries=ctx.profile.targets.roles[:4], known=known.get("workday_paths"))
-        return b, mod.fetch(b["token"], b["company"], uk_only=uk_only)
+        stats: dict = {}
+        try:
+            if b["ats"] == "smartrecruiters":
+                js = mod.fetch(b["token"], b["company"], uk_only=uk_only, want=want,
+                               known=known.get("smartrecruiters"), stats=stats)
+            elif b["ats"] == "workday":
+                js = mod.fetch(b["token"], b["company"], uk_only=uk_only, want=want,
+                               queries=ctx.profile.targets.roles[:4], known=known.get("workday_paths"), stats=stats)
+            else:
+                js = mod.fetch(b["token"], b["company"], uk_only=uk_only, stats=stats)
+            return b, js, stats, None
+        except Exception as e:
+            return b, [], stats, f"{e.__class__.__name__}: {e}"[:200]
 
     jobs: list[Job] = []
     with cf.ThreadPoolExecutor(8) as ex:
         for fut in cf.as_completed([ex.submit(fetch_board, b) for b in boards]):
-            try:
-                b, js = fut.result()
-                jobs += js
+            b, js, stats, err = fut.result()
+            jobs += js
+            health.record(db, run_at, b["ats"], b["token"], stats.get("seen", 0), js, err)
+            if err:
+                st.errors.append(f"{b['company']} ({b['ats']}) failed: {err}")
+            else:
                 db.upsert_board(b["ats"], b["token"], b["company"], b["sponsor_name"], "live", len(js))
-            except Exception as e:
-                st.errors.append(f"board fetch failed: {e}")
 
     # 2) job-board searches (Reed, Adzuna, NHS Jobs, jobs.ac.uk) with your search queries
     queries = ctx.profile.targets.search_queries or ctx.profile.targets.roles
@@ -92,12 +102,18 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
         qs = ctx.profile.targets.roles if name in ("nhs", "jobsacuk") else queries
         locs = [""] if name in ("nhs", "jobsacuk") else locations
         say(f"Searching {name} ({len(qs)} queries x {len(locs)} locations)...")
+        stats, got, errs = {}, [], []
         for q in qs:
             for loc in locs:
                 try:
-                    jobs += mod.search(q, loc, want=want, known=known.get(name))
+                    got += mod.search(q, loc, want=want, known=known.get(name), stats=stats)
                 except Exception as e:
+                    errs.append(f"{e.__class__.__name__}: {e}"[:200])
                     st.errors.append(f"{name} '{q}' failed: {e}")
+        jobs += got
+        # an error only counts against the source if every query failed
+        health.record(db, run_at, name, "", stats.get("seen", 0), got,
+                      errs[0] if errs and len(errs) == len(qs) * len(locs) else None)
 
     st.fetched = len(jobs)
     now = datetime.now(timezone.utc)
@@ -184,8 +200,23 @@ def watch(db: DB, ctx: Context, llm: Optional[LLM], say: Callable[[str], None] =
         assess_top(db, ctx, llm, limit=ctx.settings["alerts"]["max_assess_per_watch"], say=say)
     hot = alerts.send(db, ctx, say)
     say(f"{st.new} new jobs, {len(hot)} worth applying to today.")
+    from . import health
+    for i in health.insights(db):
+        if i.priority == 1 and db.get_learned(f"health_alerted:{i.title}") != datetime.now(timezone.utc).date().isoformat():
+            say(f"  ! {i.title}: {i.detail}")
+            notify.push(f"Job agent: {i.title}", i.detail)
+            db.set_learned(f"health_alerted:{i.title}", datetime.now(timezone.utc).date().isoformat())
     db.log("watch", f"new={st.new} hot={len(hot)}")
+    _refresh_dashboard(db, ctx)
     return hot
+
+
+def _refresh_dashboard(db: DB, ctx: Context) -> None:
+    try:
+        from . import dashboard
+        dashboard.build(db, ctx)
+    except Exception as e:
+        log.debug("dashboard build failed: %s", e)
 
 
 def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str] = None,
@@ -219,6 +250,8 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
         routes = visa_routes.check(ctx.profile, ctx.settings, CACHE_DIR,
                                    scaleup_count=len(register.scaleup.sponsors) if register.scaleup else 0)
         extra_insights += [Insight(p, t, d) for p, t, d in visa_routes.insights_for(routes)]
+        db.set_learned("visa_routes", [{"name": r.name, "status": r.status, "summary": r.summary, "link": r.link}
+                                       for r in routes])
     except Exception as e:
         log.debug("visa route check failed: %s", e)
 
@@ -276,6 +309,8 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
         except Exception as e:
             st.errors.append(f"Inbox check failed: {e}")
 
+    from . import health
+    extra_insights += health.insights(db)
     ins = extra_insights + insights.compute(db, ctx)
     ins.sort(key=lambda i: i.priority)
     notes = st.errors[:10]
@@ -290,4 +325,5 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
         notify.email(f"Job digest: {st.new} new jobs, {st.packed} applications ready", md, digest.to_html(md))
     db.log("run", f"fetched={st.fetched} new={st.new} short={st.shortlisted} assessed={st.assessed} "
                   f"packed={st.packed} applied={st.applied}")
+    _refresh_dashboard(db, ctx)
     return st

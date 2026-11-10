@@ -37,17 +37,28 @@ def compute(db: DB, ctx: Context) -> list[Insight]:
         names = ", ".join(f"{r['company']} ({r['title'][:40]})" for r in waiting[:5])
         out.append(Insight(1, f"{len(waiting)} strong matches ready to apply", f"{names}. Run `jobagent apply --top 5`."))
 
-    # ---- skill gaps in good-fit jobs
-    good = [b for _, b in viable if b["total"] >= thr - 10]
-    if len(good) >= 5:
-        gaps = Counter(s for b in good for s in b["missing_skills"][:6])
-        top = [(s, c) for s, c in gaps.most_common(5) if c / len(good) >= 0.2]
-        if top:
-            detail = ", ".join(f"{s} ({c / len(good):.0%} of jobs)" for s, c in top)
-            out.append(Insight(2, "Skills that would open more doors",
-                               f"Your best-matching jobs often ask for: {detail}. A small public project or "
-                               f"certification in the top one would raise your scores. If you already have "
-                               f"any of these, add them to config/profile.yaml."))
+    # ---- skill gaps, and the projects that close them
+    try:
+        from . import growth
+        active = growth.active(db)
+        for pr in active:
+            started = pr["created_at"][:10]
+            out.append(Insight(3, f"Project in progress: {pr['skill']}",
+                               f"Planned on {started}. The plan is in {pr['plan_path']}. When it's built, run "
+                               f"`jobagent grow --done \"{pr['skill']}\"`."))
+        gap_list, pool = growth.gaps(db, ctx, limit=4)
+        fresh = [g for g in gap_list if not g.status]
+        if fresh and not active:
+            top = fresh[0]
+            detail = ", ".join(f"{g.skill} ({g.share:.0%})" for g in fresh)
+            unlock = f" {top.unlocks} near-miss jobs would reach your shortlist with it." if top.unlocks else ""
+            out.append(Insight(2, f"{top.skill} would open the most doors",
+                               f"Missing from your profile, across {pool} jobs you nearly match: {detail}. "
+                               f"{top.skill} is asked for by {', '.join(top.employers[:4])}.{unlock} Get a two-week "
+                               f"project plan with `jobagent grow --plan`. If you already have one of these, add "
+                               f"it to config/profile.yaml instead."))
+    except Exception:
+        pass
 
     # ---- titles you are not targeting but match
     targets = [_title_tokens(t) for t in ctx.profile.targets.roles]

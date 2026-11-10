@@ -100,15 +100,20 @@ TAXONOMY: dict[str, list[str]] = {
     "Observability": ["observability", "prometheus", "grafana", "datadog", "opentelemetry"],
     "Git": ["git"],
     # practices
-    "Testing": ["unit testing", "tdd", "test-driven", "pytest", "jest", "automated testing", "integration tests"],
+    "Testing": ["unit testing", "unit tests", "tdd", "test-driven", "pytest", "jest", "automated testing",
+                "automated tests", "test automation", "integration tests", "integration testing", "end-to-end tests",
+                "e2e tests", "test coverage", "testing frameworks", "well-tested", "writing tests"],
     "Agile": ["agile", "scrum", "kanban"],
     "System Design": ["system design", "distributed systems", "scalable systems"],
-    "Security": ["application security", "appsec", "owasp", "secure coding"],
+    "Security": ["application security", "appsec", "owasp", "secure coding", "security engineering",
+                 "security best practices", "cyber security", "cybersecurity", "infosec", "penetration testing",
+                 "threat modelling", "threat modeling", "secure software", "security principles"],
     "Payments": ["payments", "payment systems"],
 }
 
 # Short names that are also English words; only their explicit patterns are used
-AMBIGUOUS = {"Go", "R", "C"}
+# (Security and Testing: the bare word appears in "security-first company", "A/B testing"...)
+AMBIGUOUS = {"Go", "R", "C", "Security", "Testing"}
 
 NICE_TO_HAVE_HEADERS = re.compile(
     r"(nice to have|nice-to-have|bonus|desirable|preferred|would be a plus|a plus|great if|"
@@ -150,11 +155,19 @@ def extract_skills(text: str) -> set[str]:
 
 
 def extract_weighted(text: str) -> dict[str, float]:
-    """Skills in the advert with a weight: 1.0 required, 0.4 nice-to-have, 0.7 unknown section."""
+    """Skills in the advert with a weight: 1.0 required, 0.4 nice-to-have, 0.7 unknown section,
+    0.3 for the intro before the requirements (usually the company describing itself)."""
     weights: dict[str, float] = {}
-    section_weight = 0.7
-    for line in (text or "").splitlines():
+    lines = (text or "").splitlines()
+    has_sections = any(len(l.strip()) < 80 and not l.strip().startswith("-") and REQUIRED_HEADERS.search(l)
+                       for l in lines[1:])
+    section_weight = 0.3 if has_sections else 0.7
+    for n, line in enumerate(lines):
         stripped = line.strip()
+        if n == 0 and has_sections:      # the job title always counts in full
+            for skill in extract_skills(stripped):
+                weights[skill] = 1.0
+            continue
         is_header = len(stripped) < 80 and not stripped.startswith("-")
         if is_header and NICE_TO_HAVE_HEADERS.search(stripped):
             section_weight = 0.4

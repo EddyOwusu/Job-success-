@@ -55,7 +55,7 @@ def advert(url: str) -> dict:
 
 
 def search(query: str, location: str = "", pages: int = 2, details: int = 25, want=None,
-           known: set | None = None) -> list[Job]:
+           known: set | None = None, stats: dict | None = None) -> list[Job]:
     """`known`: source ids already stored; they are skipped so repeat searches are fast."""
     jobs: list[Job] = []
     detailed = 0
@@ -68,6 +68,8 @@ def search(query: str, location: str = "", pages: int = 2, details: int = 25, wa
             break
         root = ET.fromstring(r.content)
         rows = root.findall("vacancyDetails")
+        if stats is not None:
+            stats["seen"] = stats.get("seen", 0) + len(rows)
         for v in rows:
             g = lambda tag: (v.findtext(tag) or "").strip()
             title = g("title")

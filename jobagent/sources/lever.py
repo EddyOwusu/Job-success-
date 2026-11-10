@@ -14,9 +14,11 @@ def board_exists(token: str) -> int:
     return len(data) if isinstance(data, list) else -1
 
 
-def fetch(token: str, company: str | None = None, uk_only: bool = True) -> list[Job]:
+def fetch(token: str, company: str | None = None, uk_only: bool = True, stats: dict | None = None) -> list[Job]:
     data = get_json(API.format(token=token), params={"mode": "json"})
     jobs = []
+    if stats is not None:
+        stats["seen"] = len(data) if isinstance(data, list) else 0
     for j in data if isinstance(data, list) else []:
         cats = j.get("categories") or {}
         loc = cats.get("location", "") or ""
