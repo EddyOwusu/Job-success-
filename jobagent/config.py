@@ -100,6 +100,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "headless": False,
         "chromium_path": "",          # leave blank to use Playwright's own browser
     },
+    "dashboard": {
+        "title": "Job Agent",         # the name on the dashboard's cover; call it what you like
+    },
     "speculative": {
         "max_per_week": 5,            # approach packs drafted per week (quality over volume)
     },
