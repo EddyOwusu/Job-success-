@@ -1,0 +1,143 @@
+"""Prompts. The candidate dossier goes in the system prompt so it is cached across jobs."""
+from __future__ import annotations
+
+import yaml
+
+from .models import Job, MasterCV, Profile
+
+TRUTH_RULES = """\
+Ground rules, which matter more than anything else here:
+- Use only facts in the candidate dossier. Never invent employers, dates, titles, degrees,
+  certifications, metrics, skills or achievements. If the dossier doesn't say it, the candidate
+  didn't do it.
+- You may rephrase, reorder, merge and shorten the candidate's facts, and use the advert's own
+  vocabulary for things the candidate genuinely did (e.g. "REST APIs" for "HTTP JSON endpoints").
+- Never add hidden text, keyword lists in white font or anything that tricks an ATS. Beat the
+  ATS by being relevant and readable: standard headings, the advert's exact skill names where
+  true, and no tables, columns, images or icons.
+- Right-to-work and visa answers must state the candidate's real situation exactly as given.
+"""
+
+
+def dossier(profile: Profile, cv: MasterCV) -> str:
+    p = profile.model_dump(exclude={"standard_answers"})
+    return (
+        "<candidate_profile>\n" + yaml.safe_dump(p, sort_keys=False, allow_unicode=True) + "</candidate_profile>\n"
+        "<master_cv>\n" + yaml.safe_dump(cv.model_dump(), sort_keys=False, allow_unicode=True) + "</master_cv>"
+    )
+
+
+def system_prompt(profile: Profile, cv: MasterCV, role: str) -> str:
+    return f"""You are {role} working for one candidate: {profile.personal.full_name}.
+Their goal is a tech job in the UK with a sponsor licence holder who will sponsor a
+{profile.visa.target_route} visa. Every hour they spend on the wrong application is lost, so
+be honest and specific. Write in {profile.writing.spelling}.
+
+{TRUTH_RULES}
+{dossier(profile, cv)}"""
+
+
+def job_block(job: Job, sponsor_name: str | None, extra: str = "") -> str:
+    salary = ""
+    if job.salary_min or job.salary_max:
+        salary = f"£{job.salary_min or '?'} - £{job.salary_max or '?'}"
+    return f"""<job>
+Company: {job.company}
+Title: {job.title}
+Location: {job.location} ({job.remote or 'work mode not stated'})
+Salary: {salary or 'not stated'}
+On the UK Skilled Worker sponsor register as: {sponsor_name or 'NOT FOUND on the register'}
+URL: {job.url}
+
+{job.description[:20000]}
+</job>
+{extra}"""
+
+
+ASSESS_TASK = """Assess this job for the candidate.
+
+Think like an experienced UK tech recruiter. Consider:
+- Hard requirements the candidate clearly meets or misses (years, languages, domain).
+- Whether this employer is likely to sponsor THIS role: register status, wording in the advert,
+  seniority (graduate roles at big firms often sponsor; small agencies rarely do), and whether the
+  salary can clear the Skilled Worker threshold of £{threshold:,} (new entrant: £{new_entrant:,}).
+- Security clearance, "UK nationals only" or onsite-at-client wording, which usually rule out
+  sponsored candidates.
+- How strong the candidate looks against the likely applicant pool.
+
+fit_score is the chance (0-100) this candidate gets an interview if they apply well and network.
+verdict: "apply" (strong), "apply_with_networking" (decent, needs a referral or a message to stand
+out), "stretch" (long shot), "skip" (not worth the time, or sponsorship is very unlikely).
+keywords_to_mirror: exact phrases from the advert that the candidate can truthfully use.
+"""
+
+TAILOR_TASK = """Write a tailored, ATS-friendly CV for this job.
+
+- headline: the advert's job title or the closest truthful version of it.
+- summary: 3 sentences. Lead with the most relevant experience for THIS job, using the
+  advert's language where it is true. No clichés ("passionate", "results-driven", "team player").
+- skills: 10-18 skills from the dossier, most relevant to the advert first, using the advert's
+  spelling (e.g. "PostgreSQL" vs "Postgres") when it is the same thing.
+- experience: every role from the master CV, in the same order, with the same company, title and
+  dates. Choose and rewrite 3-6 bullets per recent role (fewer for older roles): strongest
+  evidence for this job first, start each with a verb, keep the numbers.
+- projects: 0-3 one-line entries, only if they help for this job.
+- education / certifications: as in the dossier, one line each.
+Keep it to what fits on two A4 pages.
+
+Talking points from the fit assessment, use them where they are true:
+{talking_points}
+Keywords to mirror where they are true:
+{keywords}
+"""
+
+COVER_TASK = """Write a cover letter for this job, at most {max_words} words.
+
+- greeting: "Dear Hiring Team," unless the advert names a person.
+- 3-4 short paragraphs: (1) the role, and one specific, real reason this company or its product
+  appeals (taken from the advert); (2) and (3) two or three pieces of hard evidence from the
+  dossier that map to the advert's top requirements; (4) a confident close. Mention the visa only
+  if the advert raises it, and then briefly and positively ("I would need Skilled Worker
+  sponsorship; I'm a straightforward case: ...") using only true facts.
+- sign_off: "Kind regards,\\n{name}"
+Tone: {tone}.
+"""
+
+ANSWERS_TASK = """Answer these questions from the job's application form for the candidate.
+
+Rules:
+- Use the candidate's standard answers when a question matches one of them:
+{standard_answers}
+- Visa and right-to-work questions must match the candidate's visa section exactly. For
+  "Do you require sponsorship?" the honest answer is "{needs_sponsorship}".
+- For select fields, the answer must be exactly one of the listed option labels.
+- For free-text questions ("Why do you want to work here?") write 60-150 words of specific,
+  truthful content from the dossier and the advert.
+- If you cannot answer truthfully from the dossier (e.g. "Do you hold an active DV clearance?"
+  with no information), give your best honest answer, set confidence "low" and needs_human true.
+- Demographic or diversity questions: use the standard answer, or "Prefer not to say" / "I don't
+  wish to answer" if there is such an option.
+
+<questions>
+{questions}
+</questions>
+"""
+
+OUTREACH_TASK = """Plan the networking for this application, so the candidate is not just one more
+CV in the pile.
+
+- people_to_find: 3-5 job titles at {company} worth contacting, most useful first (e.g. the
+  likely hiring manager for this team, an engineer on the team, a technical recruiter, a recent
+  hire who also moved to the UK on a visa).
+- messages (all short, specific, human, in {spelling}; never grovelling, never generic):
+  1. linkedin_connection to the hiring manager, at most 280 characters, day 0
+  2. linkedin_message to a recruiter at the company, about 80 words: mention the application, one
+     piece of evidence, and politely confirm they sponsor Skilled Worker visas for this role, day 0
+  3. referral_ask to an engineer on the team, about 80 words: a real question about their work
+     first, then the ask, day 1-2
+  4. follow_up_email to the recruiter, about 90 words, day 5-7
+  5. follow_up_email second nudge, about 50 words, day 12-14
+  Use placeholders like [First name] for names you do not know.
+- tips: 3-5 concrete, company-specific ideas (e.g. a meetup they host, their engineering blog,
+  an open-source repo to contribute to, how to word the visa question).
+"""

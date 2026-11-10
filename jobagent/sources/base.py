@@ -1,0 +1,58 @@
+"""Common helpers for job sources."""
+from __future__ import annotations
+
+import re
+from datetime import datetime
+from typing import Optional
+
+UK_PLACES = (
+    "united kingdom|\\buk\\b|u\\.k\\.|great britain|england|scotland|wales|northern ireland|london|manchester|"
+    "edinburgh|glasgow|cambridge|oxford|bristol|leeds|birmingham|belfast|cardiff|newcastle|sheffield|"
+    "nottingham|liverpool|reading|brighton|milton keynes|guildford|bath|york|leicester|southampton|"
+    "aberdeen|dundee|swansea|coventry|exeter|norwich|cheltenham|harwell|warwick|slough|basingstoke"
+)
+# Same-name places abroad: "New York", "Cambridge, MA", "London, Ontario", "Birmingham, AL"...
+_NOT_UK = re.compile(
+    r"new york|\b(usa|united states|canada|ontario|australia|new south wales)\b|"
+    r",\s*(al|ak|az|ar|ca|co|ct|de|fl|ga|hi|id|il|in|ia|ks|ky|la|me|md|ma|mi|mn|ms|mo|mt|ne|nv|nh|nj|nm|ny|nc|nd|oh|ok|or|pa|ri|sc|sd|tn|tx|ut|vt|va|wa|wv|wi|wy|on|bc)\b",
+    re.I,
+)
+_UK_RE = re.compile(UK_PLACES, re.I)
+_NON_UK_REMOTE = re.compile(r"remote.{0,25}(us|usa|united states|canada|americas|india|apac|latam|germany|spain|france|poland|portugal|netherlands)", re.I)
+
+
+def is_uk(location: str, country_code: Optional[str] = None) -> bool:
+    if country_code:
+        return country_code.upper() in ("GB", "UK")
+    loc = location or ""
+    for piece in re.split(r"[;|/]| or |\band\b", loc):
+        if _UK_RE.search(piece) and not _NOT_UK.search(piece):
+            return True
+    # "Remote - EMEA/Europe" adverts often accept UK-based people
+    if _UK_RE.search(loc) and not _NOT_UK.search(loc):
+        return True
+    if re.search(r"remote", loc, re.I) and re.search(r"emea|europe", loc, re.I) and not _NON_UK_REMOTE.search(loc):
+        return True
+    return False
+
+
+def work_mode(*texts: str) -> Optional[str]:
+    t = " ".join(x or "" for x in texts).lower()
+    if "hybrid" in t:
+        return "hybrid"
+    if "remote" in t:
+        return "remote"
+    if "on-site" in t or "onsite" in t or "in office" in t or "in-office" in t:
+        return "onsite"
+    return None
+
+
+def parse_dt(value) -> Optional[datetime]:
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value / 1000 if value > 1e11 else value).astimezone()
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None

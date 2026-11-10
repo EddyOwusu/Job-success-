@@ -1,0 +1,115 @@
+# ---------------------------------------------------------------------------
+# YOUR PROFILE. Copy this file to config/profile.yaml and fill it in.
+# config/profile.yaml is git-ignored, so your details stay on your machine.
+#
+# The agent never invents facts about you. Everything it writes on an
+# application comes from this file and config/cv_master.yaml.
+# ---------------------------------------------------------------------------
+
+personal:
+  first_name: Jane
+  last_name: Doe
+  email: jane.doe@example.com
+  phone: "+44 7700 900000"
+  location: London, UK            # where you are / will be based
+  linkedin: https://www.linkedin.com/in/your-handle
+  github: https://github.com/your-handle
+  portfolio: ""                    # optional personal site
+  pronouns: ""                     # optional, only used if a form asks
+
+# What you are looking for --------------------------------------------------
+targets:
+  # Job titles you would accept. Order matters: the first ones count most.
+  roles:
+    - Software Engineer
+    - Backend Engineer
+    - Python Developer
+    - Full Stack Engineer
+    - Data Engineer
+  # Seniority you are aiming for: graduate | junior | mid | senior | staff | lead
+  seniority: [junior, mid]
+  years_experience: 3
+  # Places you can work. "Remote (UK)" means fully remote inside the UK.
+  locations: [London, Manchester, Cambridge, Remote (UK)]
+  remote_ok: true
+  hybrid_ok: true
+  onsite_ok: true
+  # Minimum base salary you will accept (GBP per year). The agent also checks
+  # each role against the Skilled Worker salary rules, see visa: below.
+  min_salary_gbp: 38000
+  # Search keywords sent to the job boards (Reed, Adzuna...). Keep them specific.
+  search_queries:
+    - python developer visa sponsorship
+    - software engineer python
+    - backend engineer django
+    - data engineer python
+  # Words that make a job a no-go if they appear in the title
+  exclude_title_words: [principal, director, head of, vp, intern, sales, recruiter, account executive]
+  # Companies you never want to apply to
+  exclude_companies: []
+  # Companies you would love to work for (they get a boost and are always searched)
+  dream_companies: []
+
+# Your skills ----------------------------------------------------------------
+# years: be honest. level: 1 = familiar, 2 = working knowledge, 3 = strong, 4 = expert
+skills:
+  - {name: Python, years: 4, level: 4}
+  - {name: Django, years: 3, level: 3}
+  - {name: FastAPI, years: 2, level: 3}
+  - {name: PostgreSQL, years: 3, level: 3}
+  - {name: Docker, years: 3, level: 3}
+  - {name: AWS, years: 2, level: 2}
+  - {name: JavaScript, years: 3, level: 3}
+  - {name: React, years: 2, level: 2}
+  - {name: Git, years: 4, level: 4}
+  - {name: REST APIs, years: 4, level: 4}
+  - {name: CI/CD, years: 2, level: 2}
+  - {name: Linux, years: 4, level: 3}
+  - {name: SQL, years: 4, level: 3}
+
+# Qualifications ---------------------------------------------------------------
+education:
+  highest_level: bachelors        # none | a_levels | diploma | bachelors | masters | phd
+  degree: BSc Computer Science
+  institution: University of Example
+  graduation_year: 2021
+  uk_degree: false                # a UK degree can make you eligible for the Graduate visa
+certifications:
+  - AWS Certified Cloud Practitioner
+
+languages: [English (fluent)]
+
+# Visa and right to work --------------------------------------------------------
+# These answers are given to employers exactly as written. Keep them truthful:
+# a wrong answer to a right-to-work question can cost you the offer later.
+visa:
+  needs_sponsorship: true
+  target_route: Skilled Worker    # UK Skilled Worker visa
+  current_status: "Outside the UK, no current UK visa"   # e.g. "Graduate visa valid until 2027-06"
+  nationality: ""                 # only filled in on forms that require it
+  # New entrants (under 26, recent graduates, or switching from a Student/Graduate
+  # visa) can be sponsored at a lower salary. See README for details.
+  new_entrant: false
+  earliest_start: "1 month notice"
+  willing_to_relocate: true
+  # Security clearance roles (SC/DV) usually need years of UK residence. Skip them?
+  skip_security_clearance_roles: true
+
+# Standard answers for application forms ------------------------------------------
+# Used when a form asks these. Leave blank to have the agent stop and ask you.
+standard_answers:
+  notice_period: "1 month"
+  salary_expectation: "£45,000 - £55,000 depending on the total package"
+  how_did_you_hear: "Company careers page"
+  gender: "Prefer not to say"
+  ethnicity: "Prefer not to say"
+  disability: "Prefer not to say"
+  veteran: "No"
+  us_person: "No"
+  over_18: "Yes"
+
+# Writing style for CVs, cover letters and messages
+writing:
+  tone: confident, warm, specific, no clichés
+  spelling: British English
+  cover_letter_max_words: 300

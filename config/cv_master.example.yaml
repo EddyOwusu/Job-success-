@@ -1,0 +1,74 @@
+# ---------------------------------------------------------------------------
+# MASTER CV. Copy to config/cv_master.yaml and fill it in.
+#
+# Put EVERYTHING here: every role, every achievement, every project, even ones
+# you would not normally include. For each job the agent picks the most
+# relevant facts and rewrites them in the job advert's language.
+# It never adds skills or achievements that are not in this file.
+#
+# Bullet tips: start with a verb, add numbers ("cut p95 latency by 40%"),
+# and name the tech you used. The more facts you give, the better the
+# tailored CVs.
+# ---------------------------------------------------------------------------
+
+headline: Backend Software Engineer, Python, APIs and cloud
+summary: >
+  Backend engineer with 4 years of experience building Python APIs and data services
+  for fintech and e-commerce products. I like owning features end to end, from design to
+  production monitoring.
+
+experience:
+  - company: Example Fintech Ltd
+    title: Software Engineer
+    location: Lagos, Nigeria (remote for EU clients)
+    start: 2023-01
+    end: present
+    bullets:
+      - text: Built and maintained 12 Django REST microservices handling 2M+ requests/day for a payments platform
+        tags: [python, django, rest apis, microservices, payments]
+      - text: Cut p95 API latency from 800ms to 220ms by adding Redis caching and fixing N+1 queries in PostgreSQL
+        tags: [redis, postgresql, performance, sql]
+      - text: Introduced GitHub Actions CI/CD with automated tests and Docker builds, reducing release time from 2 days to 30 minutes
+        tags: [ci/cd, github actions, docker, testing]
+      - text: Mentored 2 junior developers and led code reviews for a team of 6
+        tags: [mentoring, leadership, code review]
+  - company: Shopify Partner Agency
+    title: Junior Python Developer
+    location: Accra, Ghana
+    start: 2021-06
+    end: 2022-12
+    bullets:
+      - text: Developed FastAPI services that synced inventory between 30+ client stores and their warehouses
+        tags: [python, fastapi, apis, integrations]
+      - text: Wrote ETL jobs in Python and SQL that moved 5GB/day of order data into a reporting warehouse
+        tags: [etl, sql, data engineering, python]
+      - text: Built React dashboards used daily by 40 operations staff
+        tags: [react, javascript, frontend]
+
+projects:
+  - name: Open-source job scraper
+    link: https://github.com/your-handle/project
+    description: Async Python crawler with a PostgreSQL store and a FastAPI search endpoint
+    tags: [python, asyncio, postgresql, fastapi, open source]
+
+education:
+  - degree: BSc Computer Science (First Class)
+    institution: University of Example
+    year: 2021
+    details: Final-year project on distributed caching
+
+certifications:
+  - AWS Certified Cloud Practitioner (2023)
+
+# Extra facts the agent can use to answer application questions
+# ("Tell us about a challenge you overcame", "Why fintech?" ...)
+stories:
+  - title: Payments outage
+    text: >
+      During a Black Friday traffic spike our payment service started timing out. I traced it to
+      connection-pool exhaustion, shipped a hotfix in 40 minutes and then added load tests to CI
+      so it could not happen again.
+  - title: Why I want to work in the UK
+    text: >
+      London has one of the strongest fintech and engineering communities in the world and I want
+      to grow in a team that ships at that scale.

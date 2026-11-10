@@ -1,0 +1,11 @@
+anthropic>=2.0
+requests>=2.31
+PyYAML>=6.0
+pydantic>=2.6
+beautifulsoup4>=4.12
+python-docx>=1.1
+reportlab>=4.0
+# Optional, for automatic form filling:
+playwright>=1.45
+# Dev
+pytest>=8
