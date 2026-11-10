@@ -9,7 +9,8 @@ from typing import Optional
 
 from .. import render
 from ..ats import ATSReport
-from ..models import CoverLetter, FitAssessment, FormAnswers, Job, Personal, ScoreBreakdown, TailoredCV
+from ..models import (CoverLetter, FitAssessment, FormAnswers, Job, Personal, ScoreBreakdown, SupportingStatement,
+                      TailoredCV)
 from ..text import slug
 
 
@@ -31,7 +32,7 @@ def pack_dir(root: Path, job: Job) -> Path:
 def write_pack(root: Path, job: Job, person: Personal, cv: TailoredCV, letter: CoverLetter,
                score: Optional[ScoreBreakdown], assessment: Optional[FitAssessment], ats: ATSReport,
                warnings: list[str], answers: Optional[FormAnswers] = None,
-               networking_md: str = "") -> Pack:
+               networking_md: str = "", statement: Optional[SupportingStatement] = None) -> Pack:
     d = pack_dir(root, job)
     d.mkdir(parents=True, exist_ok=True)
     base = f"{slug(person.full_name)}"
@@ -69,6 +70,12 @@ def write_pack(root: Path, job: Job, person: Personal, cv: TailoredCV, letter: C
 
     if answers and answers.answers:
         write_answers(d, answers)
+    if statement:
+        out = ["# Supporting statement", "", "## Criteria check (for you, not for the form)", "",
+               "| Criterion | Met? | Evidence |", "|---|---|---|"]
+        out += [f"| {c.criterion} | {c.met} | {c.evidence} |" for c in statement.criteria]
+        out += ["", "## Statement (paste into the application form)", "", statement.statement]
+        (d / "supporting-statement.md").write_text("\n".join(out) + "\n", encoding="utf-8")
     if networking_md:
         (d / "networking.md").write_text(networking_md, encoding="utf-8")
     (d / "meta.json").write_text(json.dumps({"uid": job.uid, "company": job.company, "title": job.title,

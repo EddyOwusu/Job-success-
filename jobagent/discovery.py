@@ -28,7 +28,7 @@ def load_seed(path: Path, db: DB) -> int:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     n = 0
     for c in data.get("companies", []):
-        db.upsert_board(c["ats"], c["token"], c["name"], None, "live", -1)
+        db.upsert_board(c["ats"], str(c["token"]), c["name"], None, "live", -1)
         n += 1
     db.commit()
     return n

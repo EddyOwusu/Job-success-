@@ -26,6 +26,12 @@ targets:
     - Python Developer
     - Full Stack Engineer
     - Data Engineer
+    # Titles used by the NHS, universities, councils, banks and other non-tech employers
+    - Software Developer
+    - Application Developer
+    - Systems Developer
+    - Research Software Engineer
+    - Integration Developer
   # Seniority you are aiming for: graduate | junior | mid | senior | staff | lead
   seniority: [junior, mid]
   years_experience: 3
@@ -49,6 +55,9 @@ targets:
   exclude_companies: []
   # Companies you would love to work for (they get a boost and are always searched)
   dream_companies: []
+  # Kinds of employer to search. Non-tech employers (hospitals, universities, banks,
+  # retailers, councils) hire lots of IT staff and many sponsor visas.
+  # Turn a source off in config/settings.yaml (sources:) if you don't want it.
 
 # Your skills ----------------------------------------------------------------
 # years: be honest. level: 1 = familiar, 2 = working knowledge, 3 = strong, 4 = expert

@@ -258,3 +258,23 @@ companies:
 - name: Experian
   ats: smartrecruiters
   token: Experian
+# --- Non-tech employers with big IT / digital teams (Workday career sites) ---
+# Token = "<host>|<site>" from the careers URL. Add more with:
+#   jobagent add-board https://<company>.wd3.myworkdayjobs.com/en-GB/<Site>
+- {name: Lloyds Banking Group, ats: workday, token: "lbg.wd3.myworkdayjobs.com|LBG_Careers", sector: corporate}
+- {name: Lloyds Banking Group, ats: workday, token: "lbg.wd3.myworkdayjobs.com|Graduate_careers", sector: corporate}
+- {name: Barclays, ats: workday, token: "barclays.wd3.myworkdayjobs.com|External_Career_Site_Barclays", sector: corporate}
+- {name: London Stock Exchange Group, ats: workday, token: "lseg.wd3.myworkdayjobs.com|Careers", sector: corporate}
+- {name: GSK, ats: workday, token: "gsk.wd5.myworkdayjobs.com|GSKCareers", sector: corporate}
+- {name: AstraZeneca, ats: workday, token: "astrazeneca.wd3.myworkdayjobs.com|Careers", sector: corporate}
+- {name: Aviva, ats: workday, token: "aviva.wd1.myworkdayjobs.com|External", sector: corporate}
+- {name: Unilever, ats: workday, token: "unilever.wd3.myworkdayjobs.com|Unilever_Experienced_Professionals", sector: corporate}
+- {name: NewDay, ats: workday, token: "newday.wd3.myworkdayjobs.com|NewDay", sector: corporate}
+- {name: Universal Music Group, ats: workday, token: "umusic.wd5.myworkdayjobs.com|UMGUK", sector: corporate}
+- {name: Live Nation, ats: workday, token: "livenation.wd503.myworkdayjobs.com|lnexternalsite", sector: corporate}
+- {name: Corpay, ats: workday, token: "corpay.wd103.myworkdayjobs.com|Ext_001", sector: corporate}
+- {name: Workday, ats: workday, token: "workday.wd5.myworkdayjobs.com|Workday", sector: corporate}
+- {name: Rolls-Royce, ats: workday, token: "rollsroyce.wd3.myworkdayjobs.com|professional", sector: corporate}
+- {name: Shell, ats: workday, token: "shell.wd3.myworkdayjobs.com|ShellCareers", sector: corporate}
+# The NHS (every trust in England and Wales) and universities (jobs.ac.uk) are searched
+# with your search_queries, so they don't need entries here.

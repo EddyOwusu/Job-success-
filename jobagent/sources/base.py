@@ -52,3 +52,21 @@ def parse_dt(value) -> Optional[datetime]:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+_ABROAD = re.compile(
+    r"\b(uae|united arab emirates|dubai|abu dhabi|sharjah|qatar|doha|saudi|riyadh|oman|bahrain|kuwait|egypt|"
+    r"vietnam|hanoi|ho chi minh|china|beijing|shanghai|ningbo|suzhou|hong kong|macau|singapore|malaysia|"
+    r"kuala lumpur|india|pakistan|nigeria|kenya|ghana|south africa|japan|korea|taiwan|thailand|indonesia|"
+    r"australia|new zealand|canada|usa|united states|ireland|dublin|netherlands|germany|france|spain|italy|"
+    r"switzerland|sweden|norway|denmark|finland|belgium|austria|portugal|poland|czech|greece|cyprus|malta|"
+    r"luxembourg|kazakhstan|uzbekistan|mexico|brazil|chile)\b", re.I)
+
+
+def abroad(location: str) -> bool:
+    """True when a location names a place outside the UK (and no UK place)."""
+    loc = location or ""
+    # "University of Nottingham Ningbo China" names a UK city, so only explicit UK words count here
+    return bool(_ABROAD.search(loc)) and not re.search(
+        r"\b(uk|united kingdom|england|scotland|wales|northern ireland|london)\b", loc, re.I)
+

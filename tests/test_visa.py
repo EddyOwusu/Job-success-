@@ -12,6 +12,9 @@ from jobagent.visa import clearance_required, parse_salary, salary_check, sponso
     ("We can sponsor Skilled Worker visas.", "positive"),
     ("You must have the right to work in the UK.", "weak_negative"),
     ("Join our friendly team!", "neutral"),
+    ("Visa sponsorship: We do sponsor visas! However, we aren't able to successfully sponsor visas for every role "
+     "and every candidate.", "positive"),
+    ("At this time, we are unable to provide visa sponsorship for this role.", "negative"),
 ])
 def test_sponsorship_signal(text, label):
     assert sponsorship_signal(text).label == label

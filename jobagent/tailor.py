@@ -7,9 +7,9 @@ from typing import Optional
 
 from .config import Context
 from .llm import LLM
-from .models import (CoverLetter, FitAssessment, FormAnswers, Job, MasterCV, Profile, TailoredCV,
-                     TailoredRole)
-from .prompts import ANSWERS_TASK, COVER_TASK, TAILOR_TASK, job_block, system_prompt
+from .models import (CoverLetter, FitAssessment, FormAnswers, Job, MasterCV, Profile, SupportingStatement,
+                     TailoredCV, TailoredRole)
+from .prompts import ANSWERS_TASK, COVER_TASK, STATEMENT_TASK, TAILOR_TASK, job_block, system_prompt
 from .skills import canonical, extract_skills, extract_weighted
 
 WRITER = "an expert UK tech CV writer who knows how applicant tracking systems parse CVs"
@@ -158,6 +158,22 @@ def cover_letter(llm: Optional[LLM], ctx: Context, job: Job, sponsor: str | None
         system=system_prompt(ctx.profile, ctx.cv, WRITER),
         prompt=job_block(job, sponsor) + "\n" + task,
         schema=CoverLetter, effort=ctx.settings["llm"]["tailor_effort"],
+    )
+
+
+def needs_statement(job: Job) -> bool:
+    """NHS, universities and most public bodies shortlist on a supporting statement."""
+    return job.extra.get("sector") in ("nhs", "university") or bool(
+        re.search(r"person specification|supporting statement|essential criteria", job.description or "", re.I))
+
+
+def supporting_statement(llm: Optional[LLM], ctx: Context, job: Job, sponsor: str | None) -> Optional[SupportingStatement]:
+    if llm is None:
+        return None
+    return llm.structured(
+        system=system_prompt(ctx.profile, ctx.cv, WRITER),
+        prompt=job_block(job, sponsor) + "\n" + STATEMENT_TASK,
+        schema=SupportingStatement, effort=ctx.settings["llm"]["tailor_effort"],
     )
 
 

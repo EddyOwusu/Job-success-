@@ -116,6 +116,52 @@ def cmd_discover(a):
     print(f"\n{len(found)} new job boards at licensed sponsors. {len(db.live_boards())} boards in total.")
 
 
+def parse_board_url(url: str):
+    """(ats, token) from a careers-page URL."""
+    import re
+
+    from .sources import workday
+    pats = [
+        ("greenhouse", r"greenhouse\.io/(?:embed/job_board\?for=)?([A-Za-z0-9_-]+)"),
+        ("lever", r"jobs\.(?:eu\.)?lever\.co/([A-Za-z0-9_-]+)"),
+        ("ashby", r"jobs\.ashbyhq\.com/([A-Za-z0-9_.%-]+)"),
+        ("smartrecruiters", r"(?:jobs|careers)\.smartrecruiters\.com/([A-Za-z0-9_-]+)"),
+    ]
+    tok = workday.parse_url(url)
+    if tok:
+        return "workday", tok
+    for ats, pat in pats:
+        m = re.search(pat, url)
+        if m and m.group(1) not in ("embed", "v1"):
+            return ats, m.group(1)
+    return None, None
+
+
+def cmd_add_board(a):
+    ctx, db = _ctx_db()
+    from .sources import ATS
+
+    ats, token = parse_board_url(a.url)
+    if not ats:
+        print("Couldn't recognise that careers site. Supported: Greenhouse, Lever, Ashby, SmartRecruiters, Workday.\n"
+              "Tip: open one job on the company's careers page and paste that link; the address shows which system it uses.")
+        return 1
+    n = ATS[ats].board_exists(token)
+    if n is None or n < 0:
+        print(f"Found {ats} board '{token}' but it returned no jobs. Check the link.")
+        return 1
+    from .pipeline import load_register
+    sp = load_register(ctx).match(a.name)
+    db.upsert_board(ats, token, a.name, sp.name if sp else None, "live", n)
+    db.commit()
+    import yaml as _y
+    seed = DATA_DIR / "seed_companies.yaml"
+    with seed.open("a", encoding="utf-8") as f:
+        f.write(_y.safe_dump([{"name": a.name, "ats": ats, "token": token}], sort_keys=False))
+    print(f"Added {a.name}: {ats} '{token}' ({n} jobs). Sponsor register: " +
+          (f"YES ({sp.name})" if sp else "NOT FOUND - only jobs that say they sponsor will be kept"))
+
+
 def cmd_search(a):
     ctx, db = _ctx_db()
     from .pipeline import collect, load_register, score_all
@@ -293,6 +339,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("discover", help="find job boards of licensed sponsors")
     s.add_argument("--max", type=int, help="companies to probe this time")
     s.set_defaults(fn=cmd_discover)
+    s = sub.add_parser("add-board", help="add any company's careers site (Greenhouse/Lever/Ashby/SmartRecruiters/Workday)")
+    s.add_argument("name", help="company name, e.g. 'Guy\'s and St Thomas\' NHS Foundation Trust'")
+    s.add_argument("url", help="link to the careers page or one of its jobs")
+    s.set_defaults(fn=cmd_add_board)
     sub.add_parser("search", help="fetch and score jobs").set_defaults(fn=cmd_search)
     s = sub.add_parser("assess", help="deep Claude assessment of the shortlist")
     s.add_argument("--limit", type=int, default=None)

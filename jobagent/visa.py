@@ -7,7 +7,7 @@ from typing import Optional
 
 POSITIVE = [
     r"visa sponsorship (is )?(available|offered|provided|possible)",
-    r"(we|we're|we are|we can|we will|happy to|able to|willing to|can) (offer |provide |consider )?(visa )?sponsor",
+    r"(we|we're|we are|we can|we will|we do|happy to|able to|willing to|can) (offer |provide |consider )?(visa )?sponsor",
     r"sponsorship (is )?(available|offered|provided|considered|possible)",
     r"skilled worker (visa|sponsorship|route)",
     r"(offer|provide|support)( with)? (visa|immigration) (sponsorship|support)",
@@ -16,10 +16,13 @@ POSITIVE = [
     r"tier 2",
     r"certificate of sponsorship",
     r"open to (candidates|applicants) (who )?(require|need)(ing)? (visa )?sponsorship",
+    # NHS standard wording
+    r"(require|need)s? (current )?skilled worker sponsorship[^.]{0,80}(are|is) welcome",
+    r"eligible for (visa |skilled worker )?sponsorship",
 ]
 _NOT = r"(unable|not able|cannot|can['’]t|can not|won['’]t|will not|do not|don['’]t|does not|doesn['’]t|are not able|aren['’]t able|not possible|not in a position)"
 NEGATIVE = [
-    _NOT + r"\b[^.\n]{0,60}\bsponsor",
+    _NOT + r"\b[^.,;\n]{0,60}\bsponsor",
     r"no (visa )?sponsorship",
     r"sponsorship (is |will )?(not |un)(available|offered|possible|be (offered|provided))",
     r"not (eligible|open) (for|to) (visa )?sponsorship",
@@ -30,6 +33,8 @@ NEGATIVE = [
     r"must be (a )?(british|uk) (citizen|national)",
     r"settled status (is )?required",
 ]
+HEDGE = re.compile(r"\bevery (role|candidate|position|case)|\ball (roles|candidates|positions|cases)\b|"
+                   r"\bin (some|all) cases\b|\bguarantee", re.I)
 # Weaker: often boilerplate, and overridden if the advert also says it sponsors
 WEAK_NEGATIVE = [
     r"must (already )?have (the |an existing |existing |full |unrestricted )?right to work",
@@ -60,7 +65,9 @@ def _find(patterns: list[str], text: str) -> list[str]:
 
 def sponsorship_signal(text: str) -> SponsorshipSignal:
     text = text or ""
-    neg = _find(NEGATIVE, text)
+    # "We do sponsor visas! However, we aren't able to sponsor visas for every role and every candidate"
+    # is a hedge, not a refusal
+    neg = [n for n in _find(NEGATIVE, text) if not HEDGE.search(n)]
     pos = _find(POSITIVE, text)
     weak = _find(WEAK_NEGATIVE, text)
     # "we are unable to sponsor" contains "to sponsor", so explicit negatives win

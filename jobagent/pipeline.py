@@ -47,9 +47,8 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
     max_age = timedelta(days=ctx.settings["search"]["max_age_days"])
 
     # 1) company boards (seed + discovered + dream companies)
-    if not db.live_boards():
-        from .discovery import load_seed
-        load_seed(DATA_DIR / "seed_companies.yaml", db)
+    from .discovery import load_seed
+    load_seed(DATA_DIR / "seed_companies.yaml", db)  # picks up companies you add to the seed file
     boards = [b for b in db.live_boards() if srcs.get(b["ats"], False)]
     say(f"Checking {len(boards)} company job boards...")
 
@@ -57,6 +56,9 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
         mod = ATS[b["ats"]]
         if b["ats"] == "smartrecruiters":
             return b, mod.fetch(b["token"], b["company"], uk_only=uk_only, want=want)
+        if b["ats"] == "workday":
+            return b, mod.fetch(b["token"], b["company"], uk_only=uk_only, want=want,
+                                queries=ctx.profile.targets.roles[:4])
         return b, mod.fetch(b["token"], b["company"], uk_only=uk_only)
 
     jobs: list[Job] = []
@@ -69,17 +71,20 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
             except Exception as e:
                 st.errors.append(f"board fetch failed: {e}")
 
-    # 2) job-board APIs (Reed, Adzuna) with your search queries
+    # 2) job-board searches (Reed, Adzuna, NHS Jobs, jobs.ac.uk) with your search queries
     queries = ctx.profile.targets.search_queries or ctx.profile.targets.roles
     locations = [l for l in ctx.profile.targets.locations if "remote" not in l.lower()][:3] or [""]
     for name, mod in AGGREGATORS.items():
         if not srcs.get(name) or not mod.available():
             continue
-        say(f"Searching {name} ({len(queries)} queries x {len(locations)} locations)...")
-        for q in queries:
-            for loc in locations:
+        # NHS and universities: search by role title (their adverts rarely say "visa sponsorship")
+        qs = ctx.profile.targets.roles if name in ("nhs", "jobsacuk") else queries
+        locs = [""] if name in ("nhs", "jobsacuk") else locations
+        say(f"Searching {name} ({len(qs)} queries x {len(locs)} locations)...")
+        for q in qs:
+            for loc in locs:
                 try:
-                    jobs += mod.search(q, loc)
+                    jobs += mod.search(q, loc, want=want)
                 except Exception as e:
                     st.errors.append(f"{name} '{q}' failed: {e}")
 
@@ -112,6 +117,7 @@ def score_all(db: DB, ctx: Context, register: SponsorRegister, only_new: bool = 
         sp = register.match(job.company)
         b = score_job(job, ctx.profile, ctx.settings, sp)
         db.set_score(job.uid, b.total, b.model_dump_json())
+        db.conn.execute("UPDATE jobs SET sponsor_match=? WHERE uid=?", (sp.name if sp else None, job.uid))
         if b.blockers:
             db.conn.execute("UPDATE jobs SET status='skipped' WHERE uid=?", (job.uid,))
         elif b.total >= thr:

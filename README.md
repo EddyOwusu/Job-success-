@@ -3,9 +3,19 @@
 `jobagent` is a Python agent built to get one person hired in UK tech on a
 **Skilled Worker visa**. Every day it:
 
-1. **Searches deep.** It reads the career pages (Greenhouse, Lever, Ashby,
-   SmartRecruiters) of 85+ known UK tech employers, plus every sponsor-licensed
-   company it has *discovered*, plus Reed and Adzuna if you add free API keys.
+1. **Searches deep, beyond tech companies.** Plenty of IT jobs that come with
+   sponsorship are at hospitals, universities, banks and other big employers, so
+   it searches:
+   - **Tech companies**: the career pages (Greenhouse, Lever, Ashby, SmartRecruiters)
+     of 85+ UK tech employers, plus every sponsor-licensed company it *discovers*.
+   - **The NHS**: every trust in England and Wales through NHS Jobs (developers,
+     integration, data, informatics, IT).
+   - **Universities and research institutes** through jobs.ac.uk (research software
+     engineers, developers, systems and data roles).
+   - **Big non-tech employers** on Workday: Lloyds, Barclays, LSEG, GSK, AstraZeneca,
+     Aviva, Unilever, Rolls-Royce, Shell and more. Add any company with
+     `jobagent add-board "<name>" <careers link>`.
+   - **Reed and Adzuna** (every sector) if you add their free API keys.
 2. **Keeps only jobs that can sponsor you.** It checks every employer against the
    Home Office **register of licensed sponsors** (downloaded from gov.uk, about
    123,000 Skilled Worker sponsors), reads the advert for "we can't sponsor" or
@@ -73,6 +83,7 @@ leave your machine, apart from the job and CV text sent to the Claude API.
 | `jobagent network <id>` | Networking plan for any job |
 | `jobagent insights` | The agent's suggestions |
 | `jobagent sponsors --check "Monzo" "Revolut"` | Is a company a licensed sponsor? |
+| `jobagent add-board "Aviva" <careers link>` | Search a company's own careers site (Greenhouse, Lever, Ashby, SmartRecruiters, Workday) |
 | `jobagent discover --max 800` | Probe more sponsor companies for job boards |
 
 Each prepared application lands in `output/applications/<date>_<company>_<title>/`:
@@ -82,6 +93,8 @@ jane-doe-cv.docx / .pdf             tailored, ATS-friendly CV
 jane-doe-cover-letter.docx / .pdf   tailored cover letter
 job.md          the advert, your score, Claude's assessment, ATS check, anything the fact-checker removed
 answers.md      answers to the form's questions (CHECK marks the ones you must verify)
+supporting-statement.md   NHS / university jobs: each essential criterion mapped to your evidence,
+                          then the statement written in that order (how they shortlist)
 networking.md   who to contact, search links, messages and when to send them
 form-filled.png screenshot of the filled form (browser modes)
 ```
@@ -146,6 +159,28 @@ A-rated, not recruitment or outsourcing firms) and remembers what it has already
 checked, so each weekly run goes deeper. Add your own dream companies in
 `data/seed_companies.yaml` or `targets.dream_companies`.
 
+## NHS, universities and other non-tech employers
+
+- **Supporting statements.** NHS trusts and universities shortlist by scoring a
+  supporting statement against the person specification, criterion by criterion.
+  For these jobs the agent reads the essential and desirable criteria, checks each
+  one against your CV (met, partly, or not), and writes the statement in the same
+  order, using the criteria's own words. It never claims a criterion you don't meet;
+  it shows the closest transferable evidence instead.
+- **Titles differ outside tech.** Add titles like "Software Developer", "Systems
+  Developer", "Integration Developer", "Application Developer", "Research Software
+  Engineer" or "Digital Developer" to `targets.roles`. NHS and university searches use
+  these titles.
+- **Sponsorship wording.** The standard NHS line ("Applications from job seekers who
+  require current Skilled worker sponsorship ... are welcome") counts as a positive
+  signal; "this post is not eligible for sponsorship" is a blocker.
+- **Pay.** NHS bands and university grades are read from the advert and checked
+  against the visa threshold. Many junior NHS Band 5-6 and university Grade 6 roles pay
+  less than £41,700, so the new-entrant setting matters a lot here.
+- **Applying.** NHS Jobs and university portals need you to create an account, and
+  their forms are long. Use `--mode pack` for these: the agent prepares the CV,
+  statement and answers, and you paste them into the portal.
+
 ## Visa facts the agent uses (check them yourself)
 
 - Only employers on the [register of licensed sponsors](https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers)
@@ -200,7 +235,7 @@ recommended fallback model instead of failing.
 jobagent/
   cli.py            commands
   pipeline.py       the daily loop
-  sources/          greenhouse, lever, ashby, smartrecruiters, reed, adzuna
+  sources/          greenhouse, lever, ashby, smartrecruiters, workday, nhs, jobsacuk, reed, adzuna
   sponsors.py       Home Office sponsor register: download + fuzzy name matching
   discovery.py      finds job boards of licensed sponsors
   visa.py           sponsorship wording, clearance, salary thresholds

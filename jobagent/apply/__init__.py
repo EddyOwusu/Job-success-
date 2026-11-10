@@ -11,7 +11,7 @@ from ..config import OUTPUT_DIR, Context
 from ..db import DB
 from ..llm import LLM, LLMError
 from ..models import FitAssessment, FormAnswers, ScoreBreakdown
-from ..tailor import answer_questions, cover_letter, tailor_cv
+from ..tailor import answer_questions, cover_letter, needs_statement, supporting_statement, tailor_cv
 from .pack import Pack, write_answers, write_pack
 
 
@@ -61,6 +61,10 @@ def prepare_and_apply(db: DB, ctx: Context, llm: Optional[LLM], uid: str, mode: 
     job = db.row_to_job(row)
     mode = mode or ctx.settings["apply"]["mode"]
     msgs: list[str] = []
+    if job.source in ("nhs", "jobsacuk") and mode in ("review", "auto", "dry"):
+        msgs.append("NHS Jobs and university portals need your own login: the pack is ready to paste in at "
+                    + (job.apply_url or job.url))
+        mode = "pack"
     if mode != "pack" and not force:
         reason = check_limits(db, ctx, job.company)
         if reason:
@@ -108,8 +112,19 @@ def prepare_and_apply(db: DB, ctx: Context, llm: Optional[LLM], uid: str, mode: 
         plan, net_md = None, ""
         msgs.append(f"Networking plan failed: {e}")
 
+    statement = None
+    if needs_statement(job):
+        if llm is None:
+            msgs.append("This employer shortlists on a supporting statement: add your Claude key to have it written.")
+        else:
+            try:
+                statement = supporting_statement(llm, ctx, job, sponsor)
+                msgs.append("Supporting statement written (supporting-statement.md)")
+            except LLMError as e:
+                msgs.append(f"Supporting statement failed: {e}")
+
     pack = write_pack(OUTPUT_DIR, job, ctx.profile.personal, cv, letter, score, assessment, report, warnings,
-                      answers, net_md)
+                      answers, net_md, statement)
     db.set_status(job.uid, "packed")
     msgs.append(f"Application pack: {pack.dir}")
 

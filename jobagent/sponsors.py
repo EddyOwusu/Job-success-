@@ -29,13 +29,16 @@ GENERIC_WORDS = {
     "holdings", "holding", "services", "service", "technologies", "technology", "tech", "labs", "lab",
     "software", "digital", "solutions", "systems", "bank", "financial", "finance", "payments", "payment",
     "operations", "ventures", "research", "studios", "studio", "platforms", "platform", "ai", "io",
-    "and", "of", "trading", "enterprises", "network", "networks", "online", "markets",
+    "and", "of", "trading", "enterprises", "network",
+    # public sector: "X NHS Trust" vs "X NHS Foundation Trust" on the register
+    "nhs", "foundation", "trust", "integrated", "care", "board", "networks", "online", "markets",
 }
 
 
 def _tokens(name: str) -> list[str]:
     name = (name or "").lower().replace("&", " and ")
     name = re.sub(r"\(.*?\)", " ", name)
+    name = re.sub(r"\bicb\b", " integrated care board ", name)
     name = re.sub(r"\.(com|co\.uk|io|ai|co)\b", " ", name)
     name = re.sub(r"[^a-z0-9 ]+", " ", name.replace(".", ""))
     return [t for t in name.split() if t not in LEGAL_SUFFIXES]

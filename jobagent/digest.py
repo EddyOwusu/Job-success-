@@ -19,7 +19,8 @@ def _job_line(r) -> str:
     if r["salary_min"] or r["salary_max"]:
         sal = f" | £{int(r['salary_min'] or 0):,}-£{int(r['salary_max'] or 0):,}"
     sponsor = f"sponsor: {r['sponsor_match']}" if r["sponsor_match"] else "sponsor: not on register"
-    out = [f"- **{r['title']}** at **{r['company']}** ({r['location'][:60]}){sal}",
+    sector = (json.loads(r["extra"] or "{}").get("sector") or "tech").upper()
+    out = [f"- [{sector}] **{r['title']}** at **{r['company']}** ({r['location'][:60]}){sal}",
            f"  score {r['score']:.0f} | {fit} | {sponsor} | id `{r['uid']}`",
            f"  {r['url']}"]
     if b.get("matched_skills"):

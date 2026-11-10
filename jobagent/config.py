@@ -49,6 +49,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "smartrecruiters": True,
         "reed": True,       # needs REED_API_KEY
         "adzuna": True,     # needs ADZUNA_APP_ID / ADZUNA_APP_KEY
+        "workday": True,    # big non-tech employers (banks, pharma, insurers...)
+        "nhs": True,        # NHS Jobs: all NHS trusts in England and Wales
+        "jobsacuk": True,   # universities and research institutes
     },
     "search": {
         "country": "GB",
@@ -67,7 +70,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "general_threshold_gbp": 41700,
         "new_entrant_threshold_gbp": 33400,
         # Employers that sponsor under a different legal name than their brand
-        "aliases": {"Meta": "Facebook UK", "Coinbase": "CB Payments Ltd"},
+        "aliases": {
+            "Meta": "Facebook UK", "Coinbase": "CB Payments Ltd", "Elastic": "Elasticsearch Limited",
+            "Lloyds Banking Group": "Lloyds Bank plc", "NewDay": "NewDay Cards Limited", "Oxa": "Oxa Autonomy Limited",
+            "Paddle": "Paddle.com Market Limited", "Deliveroo": "Roofoods Ltd",
+        },
         # Going rates for common tech occupation codes. Fill in from the official
         # going-rates table (Appendix Skilled Occupations); 0 = not checked.
         "going_rates_gbp": {
@@ -99,6 +106,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
             "tech", "software", "digital", "data", "labs", "ai", "systems", "technologies",
             "solutions", "cloud", "analytics", "cyber", "app", "platform", "fintech",
             "robotics", "computing", "network", "intelligence", "engineering", "studio",
+            "health", "bank", "insurance", "energy", "media", "games", "pharma", "bio", "finance",
         ],
     },
 }

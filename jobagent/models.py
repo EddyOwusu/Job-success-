@@ -224,6 +224,18 @@ class FormAnswers(BaseModel):
     answers: list[FormAnswer]
 
 
+class CriterionEvidence(BaseModel):
+    criterion: str
+    met: str = Field(description="yes | partly | no")
+    evidence: str = Field(description="Specific, truthful example from the dossier (STAR style), or how the gap is covered")
+
+
+class SupportingStatement(BaseModel):
+    """NHS / university / public-sector style statement, scored criterion by criterion."""
+    criteria: list[CriterionEvidence]
+    statement: str = Field(description="The full supporting statement, 600-900 words, in paragraphs")
+
+
 class OutreachMessage(BaseModel):
     channel: str = Field(description="linkedin_connection | linkedin_message | email | follow_up_email | referral_ask")
     target: str = Field(description="Who it is for, e.g. 'Hiring manager', 'Recruiter', 'Engineer on the team'")

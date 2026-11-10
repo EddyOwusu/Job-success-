@@ -123,6 +123,20 @@ Rules:
 </questions>
 """
 
+STATEMENT_TASK = """This employer shortlists by scoring a supporting statement against the person
+specification, criterion by criterion. Write it for the candidate.
+
+- First, list every Essential and Desirable criterion from the advert and, for each, say whether
+  the candidate meets it (yes / partly / no) with the single best truthful example from the dossier.
+  Use the STAR shape (situation, task, action, result) in one or two sentences.
+- Then write the statement (600-900 words): a short opening on why this role and this
+  organisation (use the advert: its mission, patients, students or users), then paragraphs that
+  follow the order of the person specification, naming each criterion's words so a shortlister can
+  tick it off. Essential criteria first. For a "partly" or "no", show the closest transferable
+  evidence and how the candidate would close the gap; never claim it is met.
+- Close with availability and, only if relevant, a one-line, positive note on sponsorship.
+"""
+
 OUTREACH_TASK = """Plan the networking for this application, so the candidate is not just one more
 CV in the pile.
 

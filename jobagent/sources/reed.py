@@ -14,7 +14,7 @@ def available() -> bool:
     return bool(os.environ.get("REED_API_KEY"))
 
 
-def search(query: str, location: str = "", max_results: int = 100, details: int = 40) -> list[Job]:
+def search(query: str, location: str = "", max_results: int = 100, details: int = 40, want=None) -> list[Job]:
     auth = (os.environ["REED_API_KEY"], "")
     params = {"keywords": query, "resultsToTake": min(max_results, 100)}
     if location and "remote" not in location.lower():

@@ -33,6 +33,8 @@ TITLE_SYNONYMS = [
     (r"\bfront[- ]end\b", "frontend"),
     (r"\bfull[- ]?stack\b", "fullstack"),
     (r"\bml\b", "machine learning"),
+    (r"\brse\b", "research software engineer"),
+    (r"\bbusiness intelligence\b", "bi"),
     (r"\bsre\b", "site reliability"),
     (r"\bdev ?ops\b", "devops"),
 ]
@@ -229,7 +231,10 @@ def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Spon
 
 
 TECH_DOMAINS = {"software", "backend", "frontend", "fullstack", "data", "platform", "devops", "cloud",
-                "machine", "infrastructure", "site", "api", "web", "mobile", "ios", "android", "ai", "python"}
+                "machine", "infrastructure", "site", "api", "web", "mobile", "ios", "android", "ai", "python",
+                # common in the NHS, universities, councils, banks...
+                "systems", "system", "application", "applications", "digital", "it", "integration", "database",
+                "informatics", "research", "bi", "intelligence", "solutions", "technical", "technology"}
 
 
 def quick_title_filter(profile: Profile):
