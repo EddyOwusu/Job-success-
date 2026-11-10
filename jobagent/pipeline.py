@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import concurrent.futures as cf
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -52,13 +53,23 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
     boards = [b for b in db.live_boards() if srcs.get(b["ats"], False)]
     say(f"Checking {len(boards)} company job boards...")
 
+    # adverts we already hold: slow sources skip them, so repeat runs take a minute or two
+    known: dict[str, set] = {}
+    for r in db.conn.execute("SELECT source, source_id, extra FROM jobs"):
+        known.setdefault(r["source"], set()).add(r["source_id"])
+        if r["source"] == "workday":
+            path = json.loads(r["extra"] or "{}").get("path")
+            if path:
+                known.setdefault("workday_paths", set()).add(path)
+
     def fetch_board(b):
         mod = ATS[b["ats"]]
         if b["ats"] == "smartrecruiters":
-            return b, mod.fetch(b["token"], b["company"], uk_only=uk_only, want=want)
+            return b, mod.fetch(b["token"], b["company"], uk_only=uk_only, want=want,
+                                known=known.get("smartrecruiters"))
         if b["ats"] == "workday":
             return b, mod.fetch(b["token"], b["company"], uk_only=uk_only, want=want,
-                                queries=ctx.profile.targets.roles[:4])
+                                queries=ctx.profile.targets.roles[:4], known=known.get("workday_paths"))
         return b, mod.fetch(b["token"], b["company"], uk_only=uk_only)
 
     jobs: list[Job] = []
@@ -84,7 +95,7 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
         for q in qs:
             for loc in locs:
                 try:
-                    jobs += mod.search(q, loc, want=want)
+                    jobs += mod.search(q, loc, want=want, known=known.get(name))
                 except Exception as e:
                     st.errors.append(f"{name} '{q}' failed: {e}")
 
@@ -100,7 +111,7 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
         if not want(job.title):
             continue
         st.kept += 1
-        sp = register.match(job.company)
+        sp = register.match(job.company) or register.match_scaleup(job.company)
         if db.upsert_job(job, sp.name if sp else None):
             st.new += 1
     db.commit()
@@ -117,9 +128,12 @@ def score_all(db: DB, ctx: Context, register: SponsorRegister, only_new: bool = 
     for r in rows:
         job = db.row_to_job(r)
         sp = register.match(job.company)
-        b = score_job(job, ctx.profile, ctx.settings, sp, weights)
+        su = register.match_scaleup(job.company)
+        b = score_job(job, ctx.profile, ctx.settings, sp, weights, scaleup=su)
         db.set_score(job.uid, b.total, b.model_dump_json())
-        db.conn.execute("UPDATE jobs SET sponsor_match=? WHERE uid=?", (sp.name if sp else None, job.uid))
+        on_register = sp or su
+        db.conn.execute("UPDATE jobs SET sponsor_match=? WHERE uid=?",
+                        (on_register.name if on_register else None, job.uid))
         if b.blockers:
             db.conn.execute("UPDATE jobs SET status='skipped' WHERE uid=?", (job.uid,))
         elif b.total >= thr:
@@ -159,6 +173,21 @@ def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = 
     return n
 
 
+def watch(db: DB, ctx: Context, llm: Optional[LLM], say: Callable[[str], None] = print) -> list:
+    """Quick check for new jobs; pushes "apply today" alerts for the excellent ones."""
+    from . import alerts
+
+    register = load_register(ctx)
+    st = collect(db, ctx, register, say)
+    score_all(db, ctx, register)
+    if llm and st.new:
+        assess_top(db, ctx, llm, limit=ctx.settings["alerts"]["max_assess_per_watch"], say=say)
+    hot = alerts.send(db, ctx, say)
+    say(f"{st.new} new jobs, {len(hot)} worth applying to today.")
+    db.log("watch", f"new={st.new} hot={len(hot)}")
+    return hot
+
+
 def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str] = None,
               max_apply: Optional[int] = None, say: Callable[[str], None] = print) -> RunStats:
     from . import inbox, interview, learn, radar
@@ -183,6 +212,15 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
                                           + ". They're now in your daily search. New sponsors are often keen to hire."))
         for w in rad.pipeline_warnings:
             extra_insights.append(Insight(1, "Sponsor licence change", w))
+
+    # visa routes: HPI, new-entrant rate, threshold changes (gov.uk pages are cached for a week)
+    try:
+        from . import visa_routes
+        routes = visa_routes.check(ctx.profile, ctx.settings, CACHE_DIR,
+                                   scaleup_count=len(register.scaleup.sponsors) if register.scaleup else 0)
+        extra_insights += [Insight(p, t, d) for p, t, d in visa_routes.insights_for(routes)]
+    except Exception as e:
+        log.debug("visa route check failed: %s", e)
 
     # 2) learn from results so far, then search and score
     if ctx.settings["scoring"].get("adaptive", True):
@@ -211,6 +249,12 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
                     say(f"  {m}")
             except Exception as e:
                 st.errors.append(f"apply failed for {r['company']}: {e}")
+
+    # fresh, excellent jobs: push "apply today"
+    from . import alerts
+    for r in alerts.send(db, ctx, say):
+        t, body = alerts.describe(r)
+        extra_insights.append(Insight(1, t, body.replace("\n", ". Run: ")))
 
     # 3) replies in your inbox: rejections, interview invitations (which get a prep pack)
     if inbox.configured():

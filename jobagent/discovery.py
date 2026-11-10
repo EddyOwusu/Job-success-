@@ -136,6 +136,9 @@ def discover(db: DB, register: SponsorRegister, keywords: list[str], max_probes:
     seen_employers = [r[0] for r in db.conn.execute(
         "SELECT DISTINCT sponsor_match FROM jobs WHERE sponsor_match IS NOT NULL AND source IN ('reed','adzuna')")]
     names += seen_employers
+    # every Scale-up sponsor: a small list, and the most flexible visa route
+    if register.scaleup:
+        names += [sp.name for sp in register.scaleup.sponsors]
     names += [sp.name for sp in sorted(register.tech_like(keywords), key=priority, reverse=True)]
     todo, seen = [], set()
     for n in names:

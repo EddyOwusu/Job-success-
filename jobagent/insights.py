@@ -71,6 +71,34 @@ def compute(db: DB, ctx: Context) -> list[Insight]:
                            ", ".join(f"{c} ({n} roles)" for c, n in hot)
                            + ". Network here first: one referral can cover several roles."))
 
+    # ---- speculative approaches
+    try:
+        from . import speculative
+        for r in speculative.due_followups(db):
+            out.append(Insight(1, f"Follow up your note to {r['company']}",
+                               f"Sent 7+ days ago with no reply recorded. The follow-up text is in "
+                               f"{r['pack_dir']}/approach.md. Then run `jobagent speculative --close \"{r['company']}\"` "
+                               f"or `--replied`."))
+        waiting = speculative.unsent(db)
+        if waiting:
+            out.append(Insight(2, f"{len(waiting)} speculative approaches drafted but not sent",
+                               ", ".join(r["company"] for r in waiting[:5])
+                               + ". Send them, then run `jobagent speculative --sent \"<company>\"`."))
+        elif speculative.weekly_room(db, ctx) == ctx.settings["speculative"]["max_per_week"] and len(viable) >= 20:
+            out.append(Insight(3, "Try a few speculative approaches this week",
+                               "Some licensed sponsors use your stack but have no vacancy at your level. "
+                               "See them with `jobagent speculative`."))
+    except Exception:
+        pass
+
+    # ---- Scale-up sponsors
+    su = [(r, b) for r, b in viable if b.get("scaleup") and r["status"] in ("new", "shortlisted", "packed")]
+    if su:
+        names = ", ".join(dict.fromkeys(r["company"] for r, _ in sorted(su, key=lambda x: -x[1]["total"])[:6]))
+        out.append(Insight(2, f"{len(su)} open jobs at Scale-up sponsors",
+                           f"{names}. On the Scale-up visa you're tied to the sponsor for only 6 months, then you can "
+                           f"move freely. See them with `jobagent list --scaleup`."))
+
     # ---- salary / visa
     sponsor_ok = [b for _, b in breakdowns if b["sponsorship"] > 0]
     blocked_salary = sum(1 for _, b in breakdowns if any("threshold" in x for x in b["blockers"]))

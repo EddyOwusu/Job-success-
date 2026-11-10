@@ -14,14 +14,17 @@ def available() -> bool:
     return bool(os.environ.get("REED_API_KEY"))
 
 
-def search(query: str, location: str = "", max_results: int = 100, details: int = 40, want=None) -> list[Job]:
+def search(query: str, location: str = "", max_results: int = 100, details: int = 40, want=None,
+           known: set | None = None) -> list[Job]:
     auth = (os.environ["REED_API_KEY"], "")
     params = {"keywords": query, "resultsToTake": min(max_results, 100)}
     if location and "remote" not in location.lower():
         params.update(locationName=location, distanceFromLocation=15)
     data = get_json(f"{API}/search", params=params, auth=auth, min_interval=0.5) or {}
     jobs = []
-    for i, r in enumerate(data.get("results", [])):
+    results = [r for r in data.get("results", []) if not (known and str(r["jobId"]) in known)
+               and not (want and not want(r.get("jobTitle", "")))]
+    for i, r in enumerate(results):
         desc = r.get("jobDescription", "") or ""
         if i < details:  # the search result only has a snippet
             det = get_json(f"{API}/jobs/{r['jobId']}", auth=auth, min_interval=0.5) or {}

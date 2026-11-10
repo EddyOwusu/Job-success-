@@ -74,6 +74,14 @@ CREATE TABLE IF NOT EXISTS inbox_seen (
     msg_id TEXT PRIMARY KEY, at TEXT, job_uid TEXT, verdict TEXT
 );
 
+-- Speculative approaches to sponsors with no suitable vacancy right now
+CREATE TABLE IF NOT EXISTS speculative (
+    company TEXT PRIMARY KEY, sponsor_name TEXT, score REAL, reasons TEXT,
+    created_at TEXT, pack_dir TEXT,
+    status TEXT DEFAULT 'drafted',     -- drafted | sent | replied | closed
+    sent_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS learned (
     key TEXT PRIMARY KEY, value TEXT, at TEXT
 );
@@ -112,6 +120,8 @@ class DB:
             self.conn.execute("ALTER TABLE applications ADD COLUMN features TEXT")
         if "outcome_at" not in cols:
             self.conn.execute("ALTER TABLE applications ADD COLUMN outcome_at TEXT")
+        if "alerted_at" not in {r[1] for r in self.conn.execute("PRAGMA table_info(jobs)")}:
+            self.conn.execute("ALTER TABLE jobs ADD COLUMN alerted_at TEXT")
 
     # ------------------------------------------------------------------ learned values
     def get_learned(self, key: str, default=None):

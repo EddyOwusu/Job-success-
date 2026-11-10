@@ -14,7 +14,8 @@ def available() -> bool:
     return bool(os.environ.get("ADZUNA_APP_ID") and os.environ.get("ADZUNA_APP_KEY"))
 
 
-def search(query: str, location: str = "", pages: int = 2, max_days_old: int = 30, want=None) -> list[Job]:
+def search(query: str, location: str = "", pages: int = 2, max_days_old: int = 30, want=None,
+           known: set | None = None) -> list[Job]:
     jobs = []
     for page in range(1, pages + 1):
         params = {

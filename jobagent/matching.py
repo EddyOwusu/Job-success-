@@ -133,7 +133,7 @@ def score_freshness(job: Job) -> float:
 
 
 def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Sponsor],
-              weights: Optional[dict] = None) -> ScoreBreakdown:
+              weights: Optional[dict] = None, scaleup: Optional[Sponsor] = None) -> ScoreBreakdown:
     """`weights` defaults to WEIGHTS; learn.py supplies tuned ones once you have results."""
     blockers: list[str] = []
     notes: list[str] = []
@@ -179,7 +179,12 @@ def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Spon
             notes.append(f"Below your minimum salary of £{profile.targets.min_salary_gbp:,}")
     elif sc.status == "below":
         salary = 0.0
-        if profile.visa.needs_sponsorship:
+        su_min = settings["sponsorship"].get("scaleup_threshold_gbp", 39100)
+        top = job.salary_max or job.salary_min or 0
+        if scaleup and top >= su_min:
+            salary = 0.7
+            notes.append(f"Below the Skilled Worker minimum but meets the £{su_min:,} Scale-up minimum")
+        elif profile.visa.needs_sponsorship:
             blockers.append(sc.detail)
     else:
         salary = 0.5
@@ -191,10 +196,10 @@ def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Spon
         if sig.label == "negative":
             blockers.append("Advert says no visa sponsorship: " + sig.evidence[0][:120])
             sponsorship = 0.0
-        elif sponsor and sig.label == "positive":
+        elif (sponsor or scaleup) and sig.label == "positive":
             sponsorship = 1.0
-        elif sponsor:
-            sponsorship = 0.75 if sponsor.a_rated else 0.55
+        elif sponsor or scaleup:
+            sponsorship = 0.75 if (sponsor or scaleup).a_rated else 0.55
             if sig.label == "weak_negative":
                 sponsorship -= 0.25
                 notes.append("Advert mentions right to work. Ask the recruiter whether they sponsor for this role.")
@@ -218,6 +223,10 @@ def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Spon
     }
     w = weights or WEIGHTS
     total = sum(w.get(k, WEIGHTS[k]) * v for k, v in parts.items())
+    if scaleup and profile.visa.needs_sponsorship:
+        total += 3
+        notes.append("Licensed Scale-up sponsor: on a Scale-up visa you only have to stay with the sponsor for "
+                     "6 months, then you can change jobs without a new sponsor. Ask them which route they'd use.")
     if any(d.lower() == job.company.lower() for d in profile.targets.dream_companies):
         total += 5
         notes.append("Dream company")
@@ -230,6 +239,7 @@ def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Spon
     return ScoreBreakdown(
         total=round(min(total, 100), 1), **{k: round(v, 2) for k, v in parts.items()},
         matched_skills=matched, missing_skills=missing[:12], blockers=blockers, notes=notes,
+        scaleup=bool(scaleup),
     )
 
 

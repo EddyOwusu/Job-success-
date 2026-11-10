@@ -71,6 +71,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         # https://www.gov.uk/skilled-worker-visa/your-job
         "general_threshold_gbp": 41700,
         "new_entrant_threshold_gbp": 33400,
+        "scaleup_threshold_gbp": 39100,     # Scale-up Worker visa minimum (or the going rate, if higher)
         # Employers that sponsor under a different legal name than their brand
         "aliases": {
             "Meta": "Facebook UK", "Coinbase": "CB Payments Ltd", "Elastic": "Elasticsearch Limited",
@@ -98,6 +99,16 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "max_per_company_per_30_days": 2,
         "headless": False,
         "chromium_path": "",          # leave blank to use Playwright's own browser
+    },
+    "speculative": {
+        "max_per_week": 5,            # approach packs drafted per week (quality over volume)
+    },
+    "alerts": {
+        "hot_fit": 85,                # Claude fit score that triggers an "apply today" push
+        "hot_score": 75,              # keyword score used instead when Claude hasn't assessed the job
+        "max_age_hours": 48,          # only jobs found (and posted) this recently
+        "max_per_run": 5,
+        "max_assess_per_watch": 8,    # Claude assessments per quick check
     },
     "radar": {
         "max_probes_per_run": 40,     # newly licensed sponsors to check for job boards each run

@@ -54,7 +54,9 @@ def advert(url: str) -> dict:
             "apply_url": apply.get("href") if apply and apply.get("href") else url}
 
 
-def search(query: str, location: str = "", pages: int = 2, details: int = 25, want=None) -> list[Job]:
+def search(query: str, location: str = "", pages: int = 2, details: int = 25, want=None,
+           known: set | None = None) -> list[Job]:
+    """`known`: source ids already stored; they are skipped so repeat searches are fast."""
     jobs: list[Job] = []
     detailed = 0
     for page in range(1, pages + 1):
@@ -70,6 +72,8 @@ def search(query: str, location: str = "", pages: int = 2, details: int = 25, wa
             g = lambda tag: (v.findtext(tag) or "").strip()
             title = g("title")
             if want and not want(title):
+                continue
+            if known and (g("id") or g("reference")) in known:
                 continue
             lo, hi = _salary(g("salary")) if g("salary") else _salary(g("description"))
             url = g("url")

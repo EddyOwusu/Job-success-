@@ -50,12 +50,16 @@ class Education(BaseModel):
     degree: str = ""
     institution: str = ""
     graduation_year: Optional[int] = None
+    graduation_month: Optional[int] = None   # 1-12, helps pick the right HPI university list
+    country: str = ""                        # where the university is
     uk_degree: bool = False
 
 
 class Visa(BaseModel):
     needs_sponsorship: bool = True
     current_uk_right_to_work: bool = False   # e.g. True while on a Graduate visa
+    date_of_birth: Optional[str] = None      # YYYY-MM-DD, only used to check under-26 rules
+    had_graduate_visa: bool = False
     target_route: str = "Skilled Worker"
     current_status: str = ""
     nationality: str = ""
@@ -169,6 +173,7 @@ class ScoreBreakdown(BaseModel):
     missing_skills: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    scaleup: bool = False             # employer holds a Scale-up sponsor licence
 
 
 # --------------------------------------------------------------------------- LLM outputs

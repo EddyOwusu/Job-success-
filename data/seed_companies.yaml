@@ -278,3 +278,11 @@ companies:
 - {name: Shell, ats: workday, token: "shell.wd3.myworkdayjobs.com|ShellCareers", sector: corporate}
 # The NHS (every trust in England and Wales) and universities (jobs.ac.uk) are searched
 # with your search_queries, so they don't need entries here.
+# --- Found by `jobagent discover` on 2026-11-10 (Scale-up sponsors are the most flexible route) ---
+- {name: "Gymshark", ats: greenhouse, token: "gymshark", scaleup: true}
+- {name: "Hyperexponential", ats: ashby, token: "hyperexponential", scaleup: true}
+- {name: "Plentific", ats: ashby, token: "plentific", scaleup: true}
+- {name: "Refeyn", ats: greenhouse, token: "refeyn", scaleup: true}
+- {name: "Techary", ats: greenhouse, token: "techary", scaleup: true}
+- {name: "Veramed", ats: greenhouse, token: "veramed", scaleup: true}
+- {name: "Wheely Technologies", ats: greenhouse, token: "wheely", scaleup: true}

@@ -20,6 +20,8 @@ def _job_line(r) -> str:
         sal = f" | £{int(r['salary_min'] or 0):,}-£{int(r['salary_max'] or 0):,}"
     sponsor = f"sponsor: {r['sponsor_match']}" if r["sponsor_match"] else "sponsor: not on register"
     sector = (json.loads(r["extra"] or "{}").get("sector") or "tech").upper()
+    if b.get("scaleup"):
+        sponsor += " + Scale-up licence (free to move after 6 months)"
     out = [f"- [{sector}] **{r['title']}** at **{r['company']}** ({r['location'][:60]}){sal}",
            f"  score {r['score']:.0f} | {fit} | {sponsor} | id `{r['uid']}`",
            f"  {r['url']}"]

@@ -82,6 +82,8 @@ education:
   degree: BSc Computer Science
   institution: University of Example
   graduation_year: 2021
+  graduation_month: 7             # month on your certificate (1-12); used for the HPI visa check
+  country: Ghana                  # where the university is
   uk_degree: false                # a UK degree can make you eligible for the Graduate visa
 certifications:
   - AWS Certified Cloud Practitioner
@@ -97,7 +99,10 @@ visa:
   current_uk_right_to_work: false
   target_route: Skilled Worker    # UK Skilled Worker visa
   current_status: "Outside the UK, no current UK visa"   # e.g. "Graduate visa valid until 2027-06"
-  nationality: ""                 # only filled in on forms that require it
+  nationality: ""                 # e.g. Ghanaian. Used on forms that require it and to check
+                                  # nationality-based schemes (run `jobagent visa`)
+  date_of_birth: ""               # YYYY-MM-DD. Optional: checks the under-26 new-entrant salary rule
+  had_graduate_visa: false        # true if you've ever held a UK Graduate visa
   # New entrants (under 26, recent graduates, or switching from a Student/Graduate
   # visa) can be sponsored at a lower salary. See README for details.
   new_entrant: false

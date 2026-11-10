@@ -32,7 +32,8 @@ def advert(url: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
-def search(query: str, location: str = "", pages: int = 1, details: int = 20, want=None) -> list[Job]:
+def search(query: str, location: str = "", pages: int = 1, details: int = 20, want=None,
+           known: set | None = None) -> list[Job]:
     jobs: list[Job] = []
     detailed = 0
     for page in range(pages):
@@ -52,6 +53,8 @@ def search(query: str, location: str = "", pages: int = 1, details: int = 20, wa
             if want and not want(title):
                 continue
             url = urljoin(BASE, a["href"])
+            if known and (res.get("data-advert-id") or url.split("/job/")[-1].split("/")[0]) in known:
+                continue
             employer = (res.select_one(".j-search-result__employer") or a).get_text(" ", strip=True)
             dept = (res.select_one(".j-search-result__department") or a).get_text(" ", strip=True)
             block = res.get_text("\n", strip=True)

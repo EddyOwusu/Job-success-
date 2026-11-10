@@ -39,7 +39,8 @@ def board_exists(token: str) -> int:
 
 
 def fetch(token: str, company: str | None = None, uk_only: bool = True, want=None,
-          queries: list[str] | None = None, details: int = 40) -> list[Job]:
+          queries: list[str] | None = None, details: int = 40, known: set | None = None) -> list[Job]:
+    """`known`: advert paths already stored (extra["path"]); skipped before the slow detail request."""
     api, host = _api(token)
     seen, postings = set(), []
     for q in (queries or ["software engineer", "developer", "data engineer"])[:6]:
@@ -49,6 +50,8 @@ def fetch(token: str, company: str | None = None, uk_only: bool = True, want=Non
                 if p.get("externalPath") in seen:
                     continue
                 seen.add(p.get("externalPath"))
+                if known and p.get("externalPath") in known:
+                    continue
                 if want and not want(p.get("title", "")):
                     continue
                 loc = p.get("locationsText", "")
@@ -78,6 +81,6 @@ def fetch(token: str, company: str | None = None, uk_only: bool = True, want=Non
             url=url, apply_url=url + "/apply" if not url.endswith("/apply") else url, description=desc,
             salary_min=lo, salary_max=hi, remote=work_mode(loc, (info.get("remoteType") or "")),
             posted_at=parse_dt(info.get("startDate")), ats="workday", ats_token=token,
-            extra={"sector": "corporate"},
+            extra={"sector": "corporate", "path": p["externalPath"]},
         ))
     return jobs

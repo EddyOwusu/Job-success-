@@ -53,11 +53,22 @@
      the employer on the web and writes your prep: what to expect, likely questions with
      answer outlines from your real experience, STAR stories, topics to revise, how to
      talk about sponsorship and salary, questions to ask, and a checklist.
+   - **Speculative approaches.** It ranks licensed sponsors that use your stack but
+     have no vacancy at your level, explains why each is worth a note, and drafts the
+     note, a follow-up and a CV aimed at that company. You send them, a few a week.
+   - **Speed alerts.** `jobagent watch` is a 1-2 minute check you schedule a few times a
+     day. Excellent, freshly posted jobs trigger an "Apply today" push.
+   - **Other visa routes.** `jobagent visa` checks, against live gov.uk pages, whether
+     you qualify for routes beyond standard sponsorship: the HPI visa (no sponsor
+     needed), the Scale-up visa (free to move after 6 months), the new-entrant salary
+     rate and nationality-based schemes. Jobs at Scale-up sponsors are marked.
 8. **Announces what matters.** A daily digest (Markdown, email, phone push) shows
    the best new matches and suggestions such as: *"Terraform appears in 38% of your
    best matches"*, *"Add 'Platform Engineer' to your targets: 12 jobs fit your
    skills"*, *"Monzo has 5 roles for you: network there first"*, *"3 follow-ups due
    today"*, *"20 applications and no interviews: change approach"*.
+
+> **Setting up for the first time?** Follow [SETUP_TODO.md](SETUP_TODO.md), a step-by-step checklist.
 
 ## Quick start
 
@@ -99,6 +110,11 @@ leave your machine, apart from the job and CV text sent to the Claude API.
 | `jobagent prep <id> --stage "technical"` | Interview prep pack (also built automatically by `status <id> interview` or an invitation email) |
 | `jobagent inbox` | Read replies to your applications and update their status |
 | `jobagent radar` | Newly licensed sponsors in the last 14 days, and their job boards |
+| `jobagent watch` | Quick check for fresh jobs; pushes "Apply today" for the best ones |
+| `jobagent schedule --install` | Put the daily run and quick checks on a timetable (Windows Task Scheduler or cron) |
+| `jobagent speculative` | Sponsors worth approaching without a vacancy; `--build 3` drafts the notes and CVs |
+| `jobagent visa` | Which visa routes are open to you, checked on gov.uk |
+| `jobagent list --scaleup` | Open jobs at Scale-up sponsors |
 | `jobagent learn` | What's working: interview rates by sector, source, score, advert age, networking |
 | `jobagent insights` | The agent's suggestions |
 | `jobagent sponsors --check "Monzo" "Revolut"` | Is a company a licensed sponsor? |
@@ -118,14 +134,21 @@ networking.md   who to contact, search links, messages and when to send them
 form-filled.png screenshot of the filled form (browser modes)
 ```
 
-### Run it every morning (cron)
+### Put it on a timetable
 
-```cron
-# 07:10 every day: search, assess, prepare packs, send the digest
-10 7 * * * cd /path/to/Job-success- && .venv/bin/jobagent run --mode pack >> output/cron.log 2>&1
-# Mondays: refresh the sponsor register and discover more company job boards
-40 6 * * 1 cd /path/to/Job-success- && .venv/bin/jobagent sponsors --update && .venv/bin/jobagent discover
+```bash
+jobagent schedule             # shows the timetable and the exact commands
+jobagent schedule --install   # creates it (Windows Task Scheduler, or cron on Mac/Linux)
+jobagent schedule --remove
 ```
+
+| Time | What runs |
+|---|---|
+| 07:10 daily | `jobagent run --mode pack`: full search, assessment, packs, inbox, radar, digest |
+| 11:30, 15:30, 19:30 daily | `jobagent watch`: quick check, "Apply today" alerts |
+| 06:40 Mondays | `jobagent discover`: more sponsor job boards |
+
+Your computer must be on and awake at those times.
 
 Then each evening run `jobagent apply --top 5` (review mode), check each form and
 press Submit. That takes about 15 minutes a day for 5 strong, tailored applications.
@@ -208,6 +231,40 @@ application folder. The web research step only sends the company, role and adver
 never your personal details, and needs web search enabled for your organisation in the
 Claude Console. If research isn't available, the prep is still written from the advert,
 and without Claude you get a fill-in template built from your master CV.
+
+## Speculative approaches, speed alerts and visa routes
+
+**Speculative (`jobagent speculative`).** A target must be a licensed sponsor, share skills
+with you, have no vacancy you're already pursuing, and not say "no sponsorship" across its
+adverts. NHS bodies and universities are left out because they must hire through
+advertised vacancies. Ranking favours companies that use more of your stack, are hiring
+actively, hold a Scale-up licence, are newly licensed, or are on your dream list. Each
+entry says why no vacancy fits today (usually: their open roles are too senior).
+`--build N` writes `output/speculative/<date>_<company>/approach.md` (why them, what you
+could offer, who to contact with search links, a LinkedIn note, an email, a follow-up)
+plus a CV aimed at their stack. The limit is `speculative.max_per_week` (5). After sending,
+run `jobagent speculative --sent "<company>"`; you're reminded to follow up after 7 days.
+The agent never sends messages itself.
+
+**Speed alerts (`jobagent watch`).** A job triggers "Apply today" when it was first seen in
+the last 48 hours, isn't an old advert we only just found, and has a Claude fit of 85+
+(or a keyword score of 75+ if Claude hasn't assessed it). Each job alerts once. Change
+the bars under `alerts:` in settings. Repeat searches are fast because adverts already
+stored aren't downloaded again.
+
+**Visa routes (`jobagent visa`).** Reads the current rules from gov.uk (cached for a week):
+
+| Route | What the agent checks |
+|---|---|
+| Skilled Worker | Thresholds in your settings against gov.uk today; whether you look eligible for the new-entrant rate (under 26, or on a Student/Graduate visa) |
+| Scale-up Worker | Which employers hold a Scale-up licence; their boards are probed first by `discover`, their jobs are marked, and a salary between the Scale-up and Skilled Worker minimums isn't blocked |
+| High Potential Individual | Your university against the Home Office global universities list for your graduation year; degree awarded within 5 years; not a UK degree; no previous Graduate visa |
+| Graduate | If you have a UK degree |
+| Youth Mobility / India Young Professionals | Whether gov.uk lists your nationality |
+| Global Talent | A pointer only |
+
+If a route with no sponsor requirement looks likely, it appears at the top of your digest.
+This is a pointer to the right gov.uk pages, not immigration advice.
 
 ## NHS, universities and other non-tech employers
 
@@ -303,6 +360,9 @@ jobagent/
   inbox.py          IMAP reply reader and classifier
   radar.py          day-to-day sponsor register changes
   interview.py      researched interview prep packs
+  speculative.py    ranks sponsors without a fitting vacancy; drafts approach packs
+  alerts.py         "apply today" pushes; schedule.py sets up Task Scheduler / cron
+  visa_routes.py    HPI, Scale-up, new-entrant and other routes, checked on gov.uk
 config/             example profile and master CV (copy them with `jobagent init`)
 data/seed_companies.yaml   starting list of employers' job boards
 tests/              pytest suite (run: python -m pytest)

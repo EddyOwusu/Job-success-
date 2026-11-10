@@ -64,14 +64,21 @@ class Sponsor:
 
 
 class SponsorRegister:
-    def __init__(self, rows: Iterable[dict], aliases: dict[str, str] | None = None):
+    def __init__(self, rows: Iterable[dict], aliases: dict[str, str] | None = None,
+                 route: str = "Skilled Worker", with_scaleup: bool = True):
         # aliases: {"Coinbase": "CB Payments Ltd"} for employers that sponsor under another legal name
         self.aliases = {k.lower(): v for k, v in (aliases or {}).items()}
         self.sponsors: list[Sponsor] = []
+        rows = list(rows)
+        # Employers licensed for the Scale-up route (a separate, smaller list on the same register)
+        self.scaleup: Optional["SponsorRegister"] = (
+            SponsorRegister(rows, aliases, route="Scale-up", with_scaleup=False)
+            if with_scaleup and route == "Skilled Worker" else None)
         for r in rows:
-            route = (r.get("Route") or "").strip()
-            if route != "Skilled Worker":
+            row_route = (r.get("Route") or "").strip()
+            if row_route != route:
                 continue
+            route = row_route
             raw_name = (r.get("Organisation Name") or "").strip()
             sp = Sponsor(raw_name, (r.get("Town/City") or "").strip(), (r.get("County") or "").strip(),
                          (r.get("Type & Rating") or "").strip(), route)
@@ -141,6 +148,10 @@ class SponsorRegister:
             if score > best[0]:
                 best = (score, sp)
         return best[1]
+
+    def match_scaleup(self, company: str) -> Optional[Sponsor]:
+        """The employer's Scale-up licence entry, if it has one."""
+        return self.scaleup.match(company) if self.scaleup else None
 
     def is_sponsor(self, company: str) -> bool:
         return self.match(company) is not None

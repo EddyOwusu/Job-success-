@@ -186,6 +186,15 @@ def cmd_assess(a):
 def cmd_list(a):
     ctx, db = _ctx_db()
     where, params = "1=1", []
+    if a.scaleup:
+        rows = [r for r in db.jobs("score_json LIKE '%\"scaleup\":true%' AND status!='skipped'",
+                                   order="COALESCE(fit_score, score) DESC", limit=a.limit)]
+        if not rows:
+            print("No open jobs at Scale-up sponsors yet. Run `jobagent discover` then `jobagent search`.")
+            return
+        for r in rows:
+            print(f"{r['score'] or 0:>5.0f}  {r['status']:<11} {r['company'][:22]:<22} {r['title'][:48]:<48} {r['uid']}")
+        return
     if a.status:
         where, params = "status=?", [a.status]
     else:
@@ -286,6 +295,94 @@ def cmd_prep(a):
     for m in msgs:
         print(f"  {m}")
     print(f"Interview prep ({summary_line(path)}): {path}")
+
+
+def cmd_speculative(a):
+    ctx, db = _ctx_db()
+    from . import speculative
+    from .pipeline import load_register
+
+    for flag, status in ((a.sent, "sent"), (a.replied, "replied"), (a.close, "closed")):
+        if flag:
+            ok = speculative.mark(db, flag, status)
+            print(f"{flag} -> {status}" if ok else f"No speculative approach found for '{flag}'.")
+            if ok and status == "sent":
+                print("I'll remind you to send the follow-up in 7 days.")
+            return
+    reg = load_register(ctx)
+    ts = speculative.targets(db, ctx, reg, limit=a.limit)
+    if not ts:
+        print("No targets yet. Run `jobagent search` first so I know which sponsors use your skills.")
+        return
+    if a.build:
+        room = speculative.weekly_room(db, ctx)
+        n = min(a.build, room)
+        if n < a.build:
+            print(f"Weekly limit: {ctx.settings['speculative']['max_per_week']} approaches a week "
+                  f"({room} left). A few specific notes beat many generic ones.")
+        llm = _llm(ctx) if n else None
+        for t in ts[:n]:
+            print(f"Drafting an approach to {t.company}...")
+            d = speculative.build(db, ctx, llm, t)
+            print(f"  {d}/approach.md")
+        return
+    print("Sponsors worth approaching even though they have no vacancy that fits you today:\n")
+    for i, t in enumerate(ts, 1):
+        tag = " [Scale-up]" if t.scaleup else ""
+        print(f"{i:>2}. {t.company}{tag}  (score {t.score:.0f})")
+        for r in t.reasons:
+            print(f"      - {r}")
+    waiting = speculative.unsent(db)
+    if waiting:
+        print("\nDrafted, not sent yet: " + ", ".join(r["company"] for r in waiting))
+    print("\nDraft the notes and a CV for the top 3 with `jobagent speculative --build 3`.")
+
+
+def cmd_watch(a):
+    ctx, db = _ctx_db()
+    from .pipeline import watch
+
+    watch(db, ctx, _llm(ctx))
+
+
+def cmd_schedule(a):
+    from . import schedule
+    from .config import OUTPUT_DIR
+
+    ensure_dirs()
+    log = OUTPUT_DIR / "schedule.log"
+    if a.remove:
+        print(schedule.remove())
+        return
+    if a.install:
+        print(schedule.install(log))
+        return
+    kind, lines = schedule.plan(log)
+    print("The timetable (your computer must be on at these times):\n")
+    for name, (freq, at), args, why in schedule.TASKS:
+        print(f"  {at}  {'Mondays' if freq == 'WEEKLY' else 'daily  '}  jobagent {args:<16} {why}")
+    print("\nRun `jobagent schedule --install` to set it up, or do it yourself with:\n")
+    if kind == "cron":
+        print("  crontab -e   # then add:")
+    for l in lines:
+        print(f"  {l}")
+
+
+def cmd_visa(a):
+    ctx, db = _ctx_db()
+    from . import visa_routes
+    from .config import CACHE_DIR, OUTPUT_DIR
+    from .pipeline import load_register
+
+    reg = load_register(ctx)
+    routes = visa_routes.check(ctx.profile, ctx.settings, CACHE_DIR,
+                               scaleup_count=len(reg.scaleup.sponsors) if reg.scaleup else 0)
+    md = visa_routes.report_markdown(routes)
+    path = OUTPUT_DIR / "reports" / "visa-routes.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(md, encoding="utf-8")
+    print(md)
+    print(f"(saved to {path})")
 
 
 def cmd_radar(a):
@@ -431,6 +528,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(fn=cmd_assess)
     s = sub.add_parser("list", help="show the shortlist and pipeline")
     s.add_argument("--status", choices=STATUSES)
+    s.add_argument("--scaleup", action="store_true", help="only jobs at Scale-up sponsors")
     s.add_argument("--limit", type=int, default=30)
     s.set_defaults(fn=cmd_list)
     s = sub.add_parser("show", help="details of one job")
@@ -459,6 +557,19 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--interviewers", help="names and roles, if you know them")
     s.add_argument("--notes", help="anything they told you about the interview")
     s.set_defaults(fn=cmd_prep)
+    s = sub.add_parser("speculative", help="sponsors worth approaching without a vacancy; drafts the note and CV")
+    s.add_argument("--build", type=int, metavar="N", help="draft approach packs for the top N")
+    s.add_argument("--limit", type=int, default=10)
+    s.add_argument("--sent", metavar="COMPANY", help="you sent it: start the follow-up clock")
+    s.add_argument("--replied", metavar="COMPANY")
+    s.add_argument("--close", metavar="COMPANY")
+    s.set_defaults(fn=cmd_speculative)
+    sub.add_parser("watch", help="quick check for fresh jobs; pushes 'apply today' alerts (schedule a few times a day)").set_defaults(fn=cmd_watch)
+    s = sub.add_parser("schedule", help="show or install the daily timetable (Windows Task Scheduler or cron)")
+    s.add_argument("--install", action="store_true", help="create the scheduled tasks now")
+    s.add_argument("--remove", action="store_true", help="remove them")
+    s.set_defaults(fn=cmd_schedule)
+    sub.add_parser("visa", help="which visa routes are open to you (Skilled Worker, Scale-up, HPI...), checked on gov.uk").set_defaults(fn=cmd_visa)
     s = sub.add_parser("radar", help="newly licensed visa sponsors, and their job boards")
     s.add_argument("--days", type=int, default=14)
     s.add_argument("--update", action="store_true", help="download today's register first")
