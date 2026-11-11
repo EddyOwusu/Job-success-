@@ -179,7 +179,19 @@ def cmd_assess(a):
     llm = _llm(ctx)
     if not llm:
         return 1
-    if a.again:
+    if a.ids:
+        rows = [db.get_job(i) for i in a.ids]
+        missing = [i for i, r in zip(a.ids, rows) if r is None]
+        if missing:
+            print("No such job: " + ", ".join(missing))
+            return 1
+        for r in rows:
+            if r["status"] in ("skipped", "new"):
+                db.conn.execute("UPDATE jobs SET status='shortlisted' WHERE uid=?", (r["uid"],))
+        db.commit()
+        print(f"Assessing {len(rows)} jobs...")
+        n = assess_top(db, ctx, llm, uids=[r["uid"] for r in rows])
+    elif a.again:
         # Claude reads the jobs it already assessed again, e.g. after the rules or your profile changed
         from .prompts import ASSESS_RULES
         rows = db.jobs("assessment_json IS NOT NULL AND status IN ('shortlisted','skipped')",
@@ -639,6 +651,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(fn=cmd_add_board)
     sub.add_parser("search", help="fetch and score jobs").set_defaults(fn=cmd_search)
     s = sub.add_parser("assess", help="deep Claude assessment of the shortlist")
+    s.add_argument("ids", nargs="*", help="assess (or re-assess) exactly these jobs")
     s.add_argument("--limit", type=int, default=None)
     s.add_argument("--again", action="store_true", help="re-assess jobs Claude read under older rules")
     s.add_argument("--all", action="store_true", help="with --again: redo every assessment (e.g. after a profile change)")
