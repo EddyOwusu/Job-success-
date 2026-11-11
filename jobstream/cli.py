@@ -194,19 +194,25 @@ def cmd_assess(a):
     elif a.again:
         # Claude reads the jobs it already assessed again, e.g. after the rules or your profile changed
         from .prompts import ASSESS_RULES
-        rows = db.jobs("assessment_json IS NOT NULL AND status IN ('shortlisted','skipped')",
+        # packed jobs too: their packs should be rebuilt on the new reading. Not jobs already applied to.
+        rows = db.jobs("assessment_json IS NOT NULL AND status IN ('shortlisted','skipped','packed','new')",
                        order="COALESCE(fit_score, 0) DESC", limit=5000)
         if not a.all:   # only those read under older rules
             rows = [r for r in rows if json.loads(r["assessment_json"]).get("rules", 1) < ASSESS_RULES]
-        rows = rows[: a.limit or ctx.settings["llm"]["max_assessments_per_run"]]
+        if a.limit:
+            rows = rows[: a.limit]
         if not rows:
             print("Every assessment already uses the current rules (add --all to redo them anyway).")
             return
         for r in rows:
-            db.conn.execute("UPDATE jobs SET assessment_json=NULL, fit_score=NULL, status='shortlisted' WHERE uid=?",
+            db.conn.execute("UPDATE jobs SET assessment_json=NULL, fit_score=NULL, "
+                            "status=CASE WHEN status IN ('skipped','new') THEN 'shortlisted' ELSE status END WHERE uid=?",
                             (r["uid"],))
         db.commit()
         print(f"Re-assessing {len(rows)} jobs Claude had already read...")
+        packed = [r for r in rows if r["status"] == "packed"]
+        if packed:
+            print("  Packs to rebuild afterwards: jobstream apply " + " ".join(r["uid"] for r in packed) + " --mode pack")
         n = assess_top(db, ctx, llm, uids=[r["uid"] for r in rows])
     else:
         n = assess_top(db, ctx, llm, limit=a.limit)

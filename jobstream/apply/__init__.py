@@ -1,6 +1,7 @@
 """Prepare (and optionally submit) an application for one job."""
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -78,7 +79,9 @@ def prepare_and_apply(db: DB, ctx: Context, llm: Optional[LLM], uid: str, mode: 
         from ..assess import assess
         try:
             assessment = assess(llm, ctx, job, sponsor)
-            db.set_assessment(job.uid, assessment.fit_score, assessment.model_dump_json())
+            from ..prompts import ASSESS_RULES
+            db.set_assessment(job.uid, assessment.fit_score,
+                              json.dumps({**assessment.model_dump(), "rules": ASSESS_RULES}))
             db.commit()
         except LLMError as e:
             msgs.append(f"Assessment skipped: {e}")

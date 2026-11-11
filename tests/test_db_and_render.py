@@ -168,3 +168,34 @@ def test_assessment_prompt_knows_relocation_and_current_employer(profile, cv, se
     assert "relocate anywhere in the UK" in seen["prompt"]
     assert "internal applicant" in seen["prompt"]
     assert "Silence on sponsorship is normal" in seen["prompt"]
+
+
+def test_assess_again_includes_packed_jobs(tmp_path, monkeypatch, profile, cv, settings, capsys):
+    import json as _json
+    import types
+
+    from jobstream import cli, pipeline
+    from jobstream.config import Context
+    from jobstream.models import FitAssessment
+
+    db = DB(tmp_path / "a.db")
+    old = _json.dumps({"fit_score": 60, "verdict": "apply", "gaps": ["old"]})
+    for uid, status in [("x:1", "packed"), ("x:2", "skipped"), ("x:3", "applied")]:
+        db.conn.execute("INSERT INTO jobs (uid, source, source_id, company, title, description, status, assessment_json, "
+                        "fit_score, extra) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                        (uid, "x", uid[-1], "Acme", "Analyst " + uid, "x" * 2000, status, old, 60, '{}'))
+    db.commit()
+    ctx = Context(profile, cv, settings)
+    monkeypatch.setattr(cli, "_ctx_db", lambda: (ctx, db))
+    monkeypatch.setattr(cli, "_llm", lambda ctx: types.SimpleNamespace(usage_summary=lambda: "0 tokens"))
+    fit = FitAssessment(fit_score=75, verdict="apply", sponsorship_likelihood="high", sponsorship_evidence="",
+                        salary_meets_visa_threshold="yes", seniority_match="ok", strengths=[], gaps=[], red_flags=[],
+                        talking_points=[], keywords_to_mirror=[])
+    import jobstream.assess
+    monkeypatch.setattr(jobstream.assess, "assess", lambda *a, **k: fit)
+    cli.cmd_assess(types.SimpleNamespace(ids=[], again=True, all=False, limit=None))
+    out = capsys.readouterr().out
+    assert "Re-assessing 2 jobs" in out and "jobstream apply x:1 --mode pack" in out
+    rows = {r["uid"]: r for r in db.jobs()}
+    assert rows["x:1"]["status"] == "packed" and rows["x:2"]["status"] == "shortlisted"
+    assert _json.loads(rows["x:1"]["assessment_json"])["rules"] >= 2 and rows["x:3"]["fit_score"] == 60
