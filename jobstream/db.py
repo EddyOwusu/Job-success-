@@ -129,6 +129,16 @@ def same_place(a: str, b: str) -> bool:
     return sa <= sb or sb <= sa or pa[0] == pb[0]
 
 
+def same_advert(a: str, b: str) -> bool:
+    """Two descriptions that are the same advert text (boards trim and reformat it slightly)."""
+    from difflib import SequenceMatcher
+
+    a, b = (re.sub(r"\s+", " ", (x or "").lower())[:700] for x in (a, b))
+    if min(len(a), len(b)) < 200:
+        return False
+    return SequenceMatcher(None, a, b, autojunk=False).ratio() > 0.85
+
+
 _LEGAL = re.compile(r"\b(ltd|limited|plc|llp|llc|inc|incorporated|company|corp|corporation|group|holdings|uk|gb)\b")
 
 
@@ -183,8 +193,8 @@ class DB:
                 (ts, job.description, sponsor_match, job.uid),
             )
             return False
-        dup = next((r for r in self.conn.execute("SELECT uid, location FROM jobs WHERE fingerprint=?", (fp,))
-                    if same_place(r["location"], job.location)), None)
+        dup = next((r for r in self.conn.execute("SELECT uid, location, description FROM jobs WHERE fingerprint=?", (fp,))
+                    if same_place(r["location"], job.location) or same_advert(r["description"], job.description)), None)
         if dup:  # the same advert reposted on another board
             self.conn.execute("UPDATE jobs SET last_seen=? WHERE uid=?", (ts, dup["uid"]))
             return False
@@ -203,20 +213,23 @@ class DB:
         return True
 
     def merge_duplicates(self) -> int:
-        """Remove adverts stored twice (same employer, title and place from different boards), keeping the
-        first one seen. Jobs you have packed or applied to are never removed."""
+        """Remove adverts stored twice (same employer and title, and the same place or the same advert text),
+        keeping the first one seen. Jobs you have packed or applied to are never removed."""
         removed = 0
         # Recompute keys first, so rows stored by older versions match on the current rules
         for uid, company, title, fp in self.conn.execute("SELECT uid, company, title, fingerprint FROM jobs").fetchall():
-            if fingerprint(company, title) != fp:
-                self.conn.execute("UPDATE jobs SET fingerprint=? WHERE uid=?", (fingerprint(company, title), uid))
+            tidy = " ".join((company or "").split())
+            if fingerprint(company, title) != fp or tidy != company:
+                self.conn.execute("UPDATE jobs SET fingerprint=?, company=? WHERE uid=?",
+                                  (fingerprint(company, title), tidy, uid))
         groups = self.conn.execute("SELECT fingerprint FROM jobs GROUP BY fingerprint HAVING COUNT(*) > 1").fetchall()
         for (fp,) in groups:
-            rows = self.conn.execute("SELECT uid, location, status FROM jobs WHERE fingerprint=? ORDER BY first_seen, uid",
-                                     (fp,)).fetchall()
+            rows = self.conn.execute("SELECT uid, location, status, description FROM jobs WHERE fingerprint=? "
+                                     "ORDER BY first_seen, uid", (fp,)).fetchall()
             kept: list = []
             for r in rows:
-                twin = next((k for k in kept if same_place(k["location"], r["location"])), None)
+                twin = next((k for k in kept if same_place(k["location"], r["location"])
+                             or same_advert(k["description"], r["description"])), None)
                 in_use = r["status"] in ("packed", "applied", "interview", "offer", "rejected", "withdrawn") or \
                     self.conn.execute("SELECT 1 FROM applications WHERE job_uid=?", (r["uid"],)).fetchone()
                 if twin is not None and not in_use:

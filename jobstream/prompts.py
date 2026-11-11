@@ -73,9 +73,26 @@ Think like an experienced UK tech recruiter. Consider:
   sponsored candidates.
 - How strong the candidate looks against the likely applicant pool.
 
-fit_score is the chance (0-100) this candidate gets an interview if they apply well and network.
+How to judge some common cases:
+- Silence on sponsorship is normal: most UK adverts never mention it. If the employer is on the register and
+  the advert doesn't rule sponsorship out, that is a neutral point, not a gap. Say "ask HR early" once at most.
+- Salary: if the top of the band (or a single stated figure) reaches the candidate's floor, the job is viable;
+  the candidate asks for at least the floor. Only count salary against the job when the whole band is below it.
+  Adzuna figures with pennies or identical min and max are estimates: treat salary as not stated.
+- A short or cut-off advert is a gap in the data, not in the candidate: judge on what is there.
+- Do not list location, distance from the candidate's current town or onsite work as a weakness when the
+  candidate will relocate (see the note below). Driving licences, travel between sites and on-call are fine to
+  mention only if the advert asks for them.
+
+fit_score (0-100) is how worthwhile this application is for this candidate, given the roles a sponsored
+candidate can realistically get. Use the whole scale:
+  85+  meets every essential requirement, the employer can sponsor, the salary clears the floor: apply today
+  70-84 meets most essentials; a good CV and a message to the hiring team give a real chance
+  50-69 workable but with a clear gap (a missing essential skill, an uncertain sponsor, a weak salary)
+  under 50 a long shot, or sponsorship looks unlikely
 verdict: "apply" (strong), "apply_with_networking" (decent, needs a referral or a message to stand
 out), "stretch" (long shot), "skip" (not worth the time, or sponsorship is very unlikely).
+gaps and red_flags: only real problems, most serious first. Do not repeat a point in both lists.
 keywords_to_mirror: exact phrases from the advert that the candidate can truthfully use.
 """
 

@@ -105,3 +105,66 @@ def test_recruiter_divisions_are_agencies():
         assert is_agency(name), name
     for name in ["Reed Elsevier", "Hays Travel", "Renishaw PLC", "BDO", "Giacom", "East Suffolk Council", "Oscar Health"]:
         assert not is_agency(name), name
+
+
+def test_same_advert_text_merges_even_when_places_differ(tmp_path):
+    db = DB(tmp_path / "t.db")
+    body = ("Renishaw is a global engineering company. We are looking for a Manufacturing IT Support Analyst to "
+            "support our production sites, looking after Windows endpoints, Microsoft 365 and shop-floor systems. ") * 3
+    a = Job(source="adzuna", source_id="1", company="Renishaw", title="Manufacturing IT Support Analyst",
+            location="Wotton-under-Edge", description=body)
+    b = Job(source="adzuna", source_id="2", company="Renishaw PLC", title="Manufacturing IT Support Analyst",
+            location="Stonehouse, Gloucestershire", description=body.replace("global", "global,"))
+    c = Job(source="adzuna", source_id="3", company="Renishaw", title="Manufacturing IT Support Analyst",
+            location="Miskin, Wales", description="A different advert for our Welsh site. " * 10)
+    assert db.upsert_job(a, None) and not db.upsert_job(b, None) and db.upsert_job(c, None)
+
+
+def test_sponsor_names_that_only_share_a_first_word():
+    from jobstream.sponsors import SponsorRegister
+    rows = [{"Organisation Name": n, "Route": "Skilled Worker", "Type & Rating": "Worker (A rating)"}
+            for n in ["Sage Care Ltd", "The Sage Group plc", "Candour Care Group Ltd", "Bupa Care Services Limited",
+                      "Barts Health NHS Trust", "Acme Digital Services Ltd"]]
+    reg = SponsorRegister(rows)
+    assert reg.match("Sage").name == "The Sage Group plc"            # corporate form beats a care business
+    assert reg.match("Candour Solutions") is None                     # "solutions" is not "care group"
+    assert reg.match("Bupa").name == "Bupa Care Services Limited"
+    assert reg.match("Barts Health NHS Foundation Trust").name == "Barts Health NHS Trust"
+    assert reg.match("Acme Services UK").name == "Acme Digital Services Ltd"
+
+
+def test_full_text_from_job_page():
+    from jobstream.fulltext import from_html
+    ld = ('<html><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization"},'
+          '{"@type":"JobPosting","title":"Service Desk Analyst","description":"&lt;p&gt;Full advert&lt;/p&gt;'
+          '&lt;ul&gt;&lt;li&gt;Microsoft 365&lt;/li&gt;&lt;/ul&gt;"}]}</script></html>')
+    text = from_html(ld)
+    assert "Full advert" in text and "- Microsoft 365" in text
+    adz = '<html><section class="adp-body mx-4">About the role<p>Look after 300 users.</p></section></html>'
+    assert "300 users" in from_html(adz)
+    assert from_html("<html><p>nothing here</p></html>") == ""
+
+
+def test_assessment_prompt_knows_relocation_and_current_employer(profile, cv, settings):
+    from jobstream.assess import assess
+    from jobstream.config import Context
+    from jobstream.models import FitAssessment
+
+    seen = {}
+
+    class LLM:
+        def structured(self, *, system, prompt, schema, **kw):
+            seen["prompt"] = prompt
+            return FitAssessment(fit_score=70, verdict="apply", sponsorship_likelihood="high", sponsorship_evidence="",
+                                 salary_meets_visa_threshold="yes", seniority_match="ok", strengths=[], gaps=[],
+                                 red_flags=[], talking_points=[], keywords_to_mirror=[])
+
+    profile.targets.locations = ["Anywhere in the UK", "Remote (UK)"]
+    profile.visa.willing_to_relocate = True
+    current = next(r for r in cv.experience if r.end in ("", "present"))
+    job = Job(source="adzuna", source_id="1", company=current.company + " Ltd", title="Service Desk Analyst",
+              location="Hull", description="Support 300 users.")
+    assess(LLM(), Context(profile, cv, settings), job, None)
+    assert "relocate anywhere in the UK" in seen["prompt"]
+    assert "internal applicant" in seen["prompt"]
+    assert "Silence on sponsorship is normal" in seen["prompt"]

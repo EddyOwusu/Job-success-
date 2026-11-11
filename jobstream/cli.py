@@ -179,8 +179,19 @@ def cmd_assess(a):
     llm = _llm(ctx)
     if not llm:
         return 1
-    n = assess_top(db, ctx, llm, limit=a.limit)
-    print(f"Assessed {n} jobs ({llm.usage_summary()}). See them with `jobstream list`.")
+    if a.again:
+        # Claude reads the jobs it already assessed again, e.g. after the rules or your profile changed
+        rows = db.jobs("assessment_json IS NOT NULL AND status IN ('shortlisted','skipped')",
+                       order="COALESCE(fit_score, 0) DESC", limit=a.limit or ctx.settings["llm"]["max_assessments_per_run"])
+        for r in rows:
+            db.conn.execute("UPDATE jobs SET assessment_json=NULL, fit_score=NULL, status='shortlisted' WHERE uid=?",
+                            (r["uid"],))
+        db.commit()
+        print(f"Re-assessing {len(rows)} jobs Claude had already read...")
+        n = assess_top(db, ctx, llm, uids=[r["uid"] for r in rows])
+    else:
+        n = assess_top(db, ctx, llm, limit=a.limit)
+    print(f"Assessed {n} jobs ({llm.usage_summary()}). See them with `jobstream list --assessed`.")
 
 
 def cmd_list(a):
@@ -617,6 +628,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("search", help="fetch and score jobs").set_defaults(fn=cmd_search)
     s = sub.add_parser("assess", help="deep Claude assessment of the shortlist")
     s.add_argument("--limit", type=int, default=None)
+    s.add_argument("--again", action="store_true", help="re-assess jobs Claude already read (after a rule or profile change)")
     s.set_defaults(fn=cmd_assess)
     s = sub.add_parser("list", help="show the shortlist and pipeline")
     s.add_argument("--status", choices=STATUSES)

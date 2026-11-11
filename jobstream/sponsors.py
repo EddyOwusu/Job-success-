@@ -29,10 +29,19 @@ GENERIC_WORDS = {
     "holdings", "holding", "services", "service", "technologies", "technology", "tech", "labs", "lab",
     "software", "digital", "solutions", "systems", "bank", "financial", "finance", "payments", "payment",
     "operations", "ventures", "research", "studios", "studio", "platforms", "platform", "ai", "io",
-    "and", "of", "trading", "enterprises", "network",
-    # public sector: "X NHS Trust" vs "X NHS Foundation Trust" on the register
-    "nhs", "foundation", "trust", "integrated", "care", "board", "networks", "online", "markets",
+    "and", "of", "trading", "enterprises", "network", "networks", "online", "markets", "care",
 }
+# Public sector: "X NHS Trust" vs "X NHS Foundation Trust" on the register. These only count as generic
+# when both names are NHS bodies.
+NHS_WORDS = {"nhs", "foundation", "trust", "integrated", "board"}
+# Extra words that only say "same company, corporate form" ("Sage" -> "The Sage Group plc"). Preferred over
+# descriptive extras ("Liberty" -> "Liberty Finance Ltd"), which may be a different business.
+CORPORATE_WORDS = {"uk", "gb", "england", "europe", "emea", "international", "global", "group", "holdings",
+                   "holding", "and", "of"}
+
+
+def _generic(nhs: bool) -> set[str]:
+    return GENERIC_WORDS | NHS_WORDS if nhs else GENERIC_WORDS
 
 
 def _tokens(name: str) -> list[str]:
@@ -44,9 +53,22 @@ def _tokens(name: str) -> list[str]:
     return [t for t in name.split() if t not in LEGAL_SUFFIXES]
 
 
-def core_name(name: str) -> str:
+def _same_core(a: list[str], b: list[str]) -> bool:
+    """Same distinctive words, and no clash in what the business does: "X Solutions" is not "X Care Group"."""
+    nhs = "nhs" in a and "nhs" in b
+    generic = _generic(nhs)
+    core_a, core_b = [t for t in a if t not in generic], [t for t in b if t not in generic]
+    if not core_a or core_a != core_b:
+        return False
+    plain = CORPORATE_WORDS | (NHS_WORDS if nhs else set())
+    da, db = {t for t in a if t in generic} - plain, {t for t in b if t in generic} - plain
+    return not da or not db or da <= db or db <= da
+
+
+def core_name(name: str, nhs: bool | None = None) -> str:
     toks = _tokens(name)
-    core = [t for t in toks if t not in GENERIC_WORDS]
+    generic = _generic("nhs" in toks if nhs is None else nhs)
+    core = [t for t in toks if t not in generic]
     return " ".join(core or toks)
 
 
@@ -129,15 +151,19 @@ class SponsorRegister:
         if not toks:
             return None
         best: tuple[float, Optional[Sponsor]] = (0, None)
+        descriptive: set[str] = set()    # different businesses matched only through descriptive words
         candidates = self._index.get(toks[0], []) + self._index.get("#" + "".join(toks), [])
         for cand_toks, sp, is_alias in candidates:
+            generic = _generic("nhs" in toks and "nhs" in cand_toks)
+            longer, extra = (cand_toks, cand_toks[len(toks):]) if cand_toks[: len(toks)] == toks else \
+                (toks, toks[len(cand_toks):]) if toks[: len(cand_toks)] == cand_toks else (None, [])
             if "".join(cand_toks) == "".join(toks):
                 score = 3
-            elif cand_toks[: len(toks)] == toks and all(t in GENERIC_WORDS for t in cand_toks[len(toks):]):
-                score = 2
-            elif toks[: len(cand_toks)] == cand_toks and all(t in GENERIC_WORDS for t in toks[len(cand_toks):]):
-                score = 2
-            elif core_name(" ".join(cand_toks)) == core_name(company) and core_name(company):
+            elif longer is not None and all(t in generic for t in extra):
+                score = 2.25 if all(t in CORPORATE_WORDS for t in extra) else 2
+                if score == 2 and longer is cand_toks:
+                    descriptive.add(" ".join(cand_toks))
+            elif _same_core(toks, cand_toks):
                 score = 1
             else:
                 continue
@@ -147,6 +173,9 @@ class SponsorRegister:
                 score -= 1.25
             if score > best[0]:
                 best = (score, sp)
+        # "Liberty" fits "Liberty Finance", "Liberty Retail" and more: too ambiguous to credit
+        if best[1] is not None and best[0] < 2.25 and len(descriptive) >= 2:
+            return None
         return best[1]
 
     def match_scaleup(self, company: str) -> Optional[Sponsor]:

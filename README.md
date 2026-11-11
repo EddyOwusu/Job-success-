@@ -124,6 +124,7 @@ leave your machine, apart from the job and CV text sent to the Claude API.
 | `jobstream visa` | Which visa routes are open to you, checked on gov.uk |
 | `jobstream list --scaleup` | Open jobs at Scale-up sponsors |
 | `jobstream list --assessed` | Every job Claude has read, with its verdict and the main reason it isn't higher |
+| `jobstream assess --again` | Claude re-reads the jobs it already assessed (after you change your profile or the rules change) |
 | `jobstream dashboard --open` | The dashboard in your browser (`--lan` to read it on your phone) |
 | `jobstream grow` | Your skill gaps; `--plan` writes a two-week project plan for the top one |
 | `jobstream health` | Is every job source still working? |

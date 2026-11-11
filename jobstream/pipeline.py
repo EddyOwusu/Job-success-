@@ -163,19 +163,24 @@ def score_all(db: DB, ctx: Context, register: SponsorRegister, only_new: bool = 
         elif b.total >= thr:
             db.conn.execute("UPDATE jobs SET status='shortlisted' WHERE uid=?", (job.uid,))
             n += 1
+        elif r["status"] == "shortlisted":     # fell below the bar after a rule change (e.g. now known as an agency)
+            db.conn.execute("UPDATE jobs SET status='new' WHERE uid=?", (job.uid,))
     db.commit()
     return n
 
 
 def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = None,
-               say: Callable[[str], None] = print, fresh_only: bool = False) -> int:
-    """Claude reads the best unassessed shortlisted jobs. fresh_only: just the new, alert-worthy ones."""
+               say: Callable[[str], None] = print, fresh_only: bool = False, uids: Optional[list[str]] = None) -> int:
+    """Claude reads the best unassessed shortlisted jobs. fresh_only: just the new, alert-worthy ones.
+    uids: exactly these jobs."""
     if not llm:
         return 0
     from .assess import assess
 
     limit = limit or ctx.settings["llm"]["max_assessments_per_run"]
-    if fresh_only:
+    if uids is not None:
+        rows = [r for r in (db.get_job(u) for u in uids) if r is not None]
+    elif fresh_only:
         a = ctx.settings["alerts"]
         since = (datetime.now(timezone.utc) - timedelta(hours=a["max_age_hours"])).isoformat()
         rows = db.jobs("status='shortlisted' AND assessment_json IS NULL AND sponsor_match IS NOT NULL "
@@ -187,15 +192,24 @@ def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = 
         if rows:
             say(f"Claude is assessing the top {len(rows)} shortlisted jobs...")
     n = 0
+    from . import fulltext
 
     def one(r):
         job = db.row_to_job(r)
-        return r, assess(llm, ctx, job, r["sponsor_match"])
+        if not job.extra.get("full_text_tried"):
+            text = fulltext.fetch(job)
+            job.extra["full_text_tried"] = True
+            if text:
+                job.description = text
+        return r, job, assess(llm, ctx, job, r["sponsor_match"])
 
     with cf.ThreadPoolExecutor(4) as ex:
         for fut in cf.as_completed([ex.submit(one, r) for r in rows]):
             try:
-                r, a = fut.result()
+                r, job, a = fut.result()
+                # SQLite is written from this thread only
+                db.conn.execute("UPDATE jobs SET description=?, extra=? WHERE uid=?",
+                                (job.description, json.dumps(job.extra), r["uid"]))
                 db.set_assessment(r["uid"], a.fit_score, a.model_dump_json())
                 if a.verdict == "skip":
                     db.conn.execute("UPDATE jobs SET status='skipped' WHERE uid=?", (r["uid"],))
