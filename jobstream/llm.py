@@ -17,28 +17,60 @@ class LLMError(RuntimeError):
     pass
 
 
+class BudgetReached(LLMError):
+    """Today's Claude budget is spent: callers fall back to their no-Claude path."""
+
+
 class LLM:
     """Structured calls to Claude. One instance per run."""
 
-    def __init__(self, model: str = "claude-opus-5-5"):
+    def __init__(self, model: str = "claude-opus-5-5", budget_usd: float = 0.0, ledger=None, client=None):
         import anthropic  # imported lazily so the agent runs without the package
 
         self.anthropic = anthropic
-        self.client = anthropic.Anthropic(max_retries=4)
+        self.client = client or anthropic.Anthropic(max_retries=4)
         self.model = model
         self.input_tokens = 0
         self.output_tokens = 0
+        self.spent = 0.0                 # this process
+        self.budget_usd = budget_usd     # per day, all processes; 0 = no limit
+        self.ledger = ledger
+
+    # ------------------------------------------------------------------ budget
+    def spent_today(self) -> float:
+        return self.ledger.today() if self.ledger else self.spent
+
+    def over_budget(self) -> bool:
+        return bool(self.budget_usd) and self.spent_today() >= self.budget_usd
+
+    def _check_budget(self) -> None:
+        if self.over_budget():
+            raise BudgetReached(f"Today's Claude budget (${self.budget_usd:.2f}) is used up; carrying on without Claude "
+                                f"until tomorrow")
+
+    def _charge(self, resp, model: str, task: str) -> None:
+        from .spend import cost
+        if not resp.usage:
+            return
+        self.input_tokens += resp.usage.input_tokens or 0
+        self.output_tokens += resp.usage.output_tokens or 0
+        usd = cost(getattr(resp, "model", None) or model, resp.usage)
+        self.spent += usd
+        if self.ledger:
+            self.ledger.add(usd, model, task)
 
     def structured(self, *, system: str, prompt: str, schema: type[T], effort: str = "medium",
-                   max_tokens: int = 16000, cache_system: bool = True) -> T:
-        """Ask Claude for a JSON answer that validates against `schema`."""
+                   max_tokens: int = 16000, cache_system: bool = True, model: Optional[str] = None) -> T:
+        """Ask Claude for a JSON answer that validates against `schema`. model: override for this call."""
         a = self.anthropic
+        model = model or self.model
+        self._check_budget()
         system_blocks = [{"type": "text", "text": system}]
         if cache_system:
             system_blocks[0]["cache_control"] = {"type": "ephemeral"}
         try:
             resp = self.client.beta.messages.parse(
-                model=self.model,
+                model=model,
                 max_tokens=max_tokens,
                 system=system_blocks,
                 messages=[{"role": "user", "content": prompt}],
@@ -60,9 +92,7 @@ class LLM:
         except a.APIConnectionError as e:
             raise LLMError("Could not reach the Claude API (network problem)") from e
 
-        if resp.usage:
-            self.input_tokens += resp.usage.input_tokens or 0
-            self.output_tokens += resp.usage.output_tokens or 0
+        self._charge(resp, model, schema.__name__)
         if resp.stop_reason == "refusal":
             raise LLMError(f"Claude declined this request: {getattr(resp.stop_details, 'explanation', '')}")
         if resp.stop_reason == "max_tokens":
@@ -80,6 +110,7 @@ class LLM:
         Web search must be allowed for your organisation in the Claude Console.
         """
         a = self.anthropic
+        self._check_budget()
         tools = [{"type": "web_search_20260209", "name": "web_search", "max_uses": max_searches,
                   "user_location": {"type": "approximate", "country": "GB"}}]
         messages = [{"role": "user", "content": prompt}]
@@ -93,9 +124,7 @@ class LLM:
                     thinking={"type": "adaptive"}, output_config={"effort": effort},
                     betas=[FALLBACK_BETA], fallbacks="default",
                 )
-                if resp.usage:
-                    self.input_tokens += resp.usage.input_tokens or 0
-                    self.output_tokens += resp.usage.output_tokens or 0
+                self._charge(resp, self.model, "research")
                 for block in resp.content:
                     if block.type == "text":
                         text_parts.append(block.text)
@@ -121,14 +150,20 @@ class LLM:
         return "".join(text_parts).strip(), [(t, u) for u, t in sources.items()]
 
     def usage_summary(self) -> str:
-        return f"{self.input_tokens:,} input / {self.output_tokens:,} output tokens"
+        out = f"{self.input_tokens:,} input / {self.output_tokens:,} output tokens, about ${self.spent:.2f}"
+        if self.ledger:
+            out += f"; today ${self.spent_today():.2f}" + (f" of ${self.budget_usd:.2f}" if self.budget_usd else "")
+        return out
 
 
 def make_llm(settings: dict) -> Optional[LLM]:
     if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
         return None
     try:
-        return LLM(settings["llm"]["model"])
+        from .config import DATA_DIR
+        from .spend import Ledger
+        return LLM(settings["llm"]["model"], budget_usd=float(settings["llm"].get("daily_budget_usd") or 0),
+                   ledger=Ledger(DATA_DIR / "spend.db"))
     except ImportError:
         log.warning("The `anthropic` package is not installed; running without Claude")
         return None

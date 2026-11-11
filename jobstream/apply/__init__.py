@@ -162,6 +162,10 @@ def prepare_and_apply(db: DB, ctx: Context, llm: Optional[LLM], uid: str, mode: 
 
     submitted = False
     method = "pack"
+    if mode in ("auto", "review") and llm is not None and llm.over_budget() and not force:
+        msgs.append(f"Today's Claude budget (${llm.budget_usd:.2f}) is used up, so this wasn't sent. The pack is ready; "
+                    "apply tomorrow, or raise the budget with `jobstream budget --daily`.")
+        mode = "pack"
     if mode == "auto":
         from ..agencies import is_agency
         why = "agency" if is_agency(job.company, job.extra) else "" if sponsor else "not_sponsor"

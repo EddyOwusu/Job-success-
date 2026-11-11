@@ -35,7 +35,12 @@ def load_dotenv(path: Path | None = None) -> None:
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "llm": {
-        "model": "claude-opus-5-5",
+        "model": "claude-opus-5-5",       # CVs, cover letters, form answers, interview prep
+        # Reading and scoring adverts: many calls, so a cheaper model (half Opus's price)
+        "assess_model": "claude-sonnet-5-5",
+        # Stop calling Claude for the day once this much (USD, estimated) is spent. 0 = no limit.
+        # `jobstream budget` shows today's spend.
+        "daily_budget_usd": 3.0,
         # Effort per task. Higher = better writing, more tokens.
         "assess_effort": "medium",
         "tailor_effort": "high",
@@ -98,7 +103,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         # auto:   submit by itself when every required field has a confident answer
         # pack:   only build the application pack (CV, letter, answers) for you to submit
         "mode": "review",
-        "max_applications_per_day": 10,
+        "max_applications_per_day": 3,
         "max_per_company_per_30_days": 2,
         "headless": True,             # auto mode runs without a visible window (review always shows one)
         "chromium_path": "",          # leave blank to use Playwright's own browser

@@ -507,6 +507,47 @@ def cmd_schedule(a):
         print(f"  {l}")
 
 
+def cmd_budget(a):
+    """Today's Claude spend, and the money settings (written to config/settings.yaml)."""
+    from . import config
+    from .spend import MODEL_NAMES, Ledger
+
+    path = config.CONFIG_DIR / "settings.yaml"
+    changes = {}
+    if a.daily is not None:
+        changes[("llm", "daily_budget_usd")] = float(a.daily)
+    if a.applications is not None:
+        changes[("apply", "max_applications_per_day")] = int(a.applications)
+    if a.assess_model:
+        changes[("llm", "assess_model")] = MODEL_NAMES[a.assess_model]
+    if a.writing_model:
+        changes[("llm", "model")] = MODEL_NAMES[a.writing_model]
+    if changes:
+        data = config._read_yaml(path) if path.exists() else {}
+        for (section, key), value in changes.items():
+            data.setdefault(section, {})[key] = value
+        path.write_text("# Agent settings. Delete anything you don't change; defaults live in jobstream/config.py\n"
+                        + yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        print("Saved to config/settings.yaml.\n")
+
+    ctx = load_context()
+    llm, ap = ctx.settings["llm"], ctx.settings["apply"]
+    ledger = Ledger(config.DATA_DIR / "spend.db")
+    budget = float(llm.get("daily_budget_usd") or 0)
+    today = ledger.today()
+    print(f"Claude today:        ${today:.2f}" + (f" of ${budget:.2f}" if budget else " (no daily limit)"))
+    for task, n, usd in ledger.by_task():
+        print(f"  {task or 'other':<22} {n:>3} calls  ${usd:.2f}")
+    days = ledger.last_days(7)
+    if len(days) > 1:
+        print("Last days:           " + ", ".join(f"{d[5:]} ${u:.2f}" for d, u in days))
+    print(f"\nDaily budget:        {'$%.2f' % budget if budget else 'none'}   (change: jobstream budget --daily 3)")
+    print(f"Applications a day:  {ap['max_applications_per_day']}   (change: jobstream budget --applications 3)")
+    print(f"Assessing jobs:      {llm.get('assess_model') or llm['model']}   (--assess-model sonnet | haiku | opus)")
+    print(f"CVs and letters:     {llm['model']}   (--writing-model opus | sonnet)")
+    print("\nThese are estimates from list prices. Your exact bill is in the Claude Console, under Usage.")
+
+
 def cmd_visa(a):
     ctx, db = _ctx_db()
     from . import visa_routes
@@ -732,6 +773,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--mode", choices=["pack", "auto"], default="pack",
                    help="pack: build application packs for you to send | auto: apply to the best matches by itself")
     s.set_defaults(fn=cmd_schedule)
+    s = sub.add_parser("budget", help="what Claude has cost today, and the daily budget / applications a day")
+    s.add_argument("--daily", type=float, metavar="USD", help="stop calling Claude for the day after this much (0 = no limit)")
+    s.add_argument("--applications", type=int, metavar="N", help="most applications to send a day")
+    s.add_argument("--assess-model", choices=["opus", "sonnet", "haiku"], help="model for reading and scoring adverts")
+    s.add_argument("--writing-model", choices=["opus", "sonnet"], help="model for CVs, letters and form answers")
+    s.set_defaults(fn=cmd_budget)
     sub.add_parser("visa", help="which visa routes are open to you (Skilled Worker, Scale-up, HPI...), checked on gov.uk").set_defaults(fn=cmd_visa)
     s = sub.add_parser("radar", help="newly licensed visa sponsors, and their job boards")
     s.add_argument("--days", type=int, default=14)

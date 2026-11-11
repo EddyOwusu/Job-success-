@@ -47,6 +47,16 @@ def _job(r) -> dict:
     }
 
 
+def _spend(ctx: Context) -> dict:
+    from .config import DATA_DIR
+    from .spend import Ledger
+    try:
+        today = Ledger(DATA_DIR / "spend.db").today()
+    except Exception:
+        today = 0.0
+    return {"today": round(today, 2), "budget": float(ctx.settings["llm"].get("daily_budget_usd") or 0)}
+
+
 def _short(uid: str) -> str:
     """A short form of a job id for commands (the CLI accepts any unique part of an id)."""
     tail = str(uid).split(":")[-1]
@@ -135,6 +145,7 @@ def collect(db: DB, ctx: Context) -> dict:
         "counts": {**counts, "new_today": new_today},
         "todo": todo[:12],
         "needs": needs[:20],
+        "spend": _spend(ctx),
         "live": None,                  # set by the server: buttons work only when the page is served
         "insights": [{"p": i.priority, "title": i.title, "detail": i.detail} for i in ins][:12],
         "shortlist": shortlist, "applications": apps, "blockers": blockers,

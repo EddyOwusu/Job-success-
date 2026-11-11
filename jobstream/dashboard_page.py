@@ -361,7 +361,8 @@ function show(){
 window.addEventListener('hashchange', () => { show(); window.scrollTo(0, 0); });
 const worst = D.health.some(s => s.state === 'broken') ? 'broken' : D.health.some(s => s.state === 'warn') ? 'warn' : D.health.length ? 'ok' : 'new';
 const healthText = {broken: D.health.filter(s => s.state === 'broken').length + ' source(s) not working', warn: 'A source needs checking', ok: 'All sources working', new: 'No searches yet'}[worst];
-{ const f = $('#sidefoot'), l = el('div'); l.append(el('i', 'dot ' + (worst === 'ok' ? '' : worst)), document.createTextNode(healthText)); f.append(l, el('div', null, D.last_run ? 'Last search ' + day(D.last_run) + ', ' + D.last_run.slice(11, 16) + ' UTC' : 'Not searched yet')); }
+{ const f = $('#sidefoot'), l = el('div'); l.append(el('i', 'dot ' + (worst === 'ok' ? '' : worst)), document.createTextNode(healthText)); f.append(l, el('div', null, D.last_run ? 'Last search ' + day(D.last_run) + ', ' + D.last_run.slice(11, 16) + ' UTC' : 'Not searched yet'));
+  if (D.spend) f.append(el('div', 'tn', 'Claude today $' + D.spend.today.toFixed(2) + (D.spend.budget ? ' of $' + D.spend.budget.toFixed(2) : ''))); }
 
 // ---------- overview
 $('#ov-sub').textContent = D.generated.replace(/,.*/, '') + (D.last_run ? ' · last search ' + D.last_run.slice(11, 16) + ' UTC' : '');

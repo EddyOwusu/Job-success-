@@ -67,6 +67,9 @@ with no spaces or quotes, for example `ANTHROPIC_API_KEY=sk-ant-...`. Save and c
 
 ## 5. First run
 
+- [ ] `jobstream budget --daily 3 --applications 3 --assess-model sonnet`: caps Claude at about $3 a day.
+      Also set a monthly spend limit in the Claude Console (Settings, Limits) and keep auto-reload off
+
 - [ ] `jobstream doctor`: checks the setup
 - [ ] `jobstream visa`: which visa routes are open to you (HPI, Scale-up, new-entrant rate), checked on gov.uk
 - [ ] `jobstream discover`: finds more sponsor job boards (takes a few minutes)

@@ -125,6 +125,7 @@ leave your machine, apart from the job and CV text sent to the Claude API.
 | `jobstream list --scaleup` | Open jobs at Scale-up sponsors |
 | `jobstream list --assessed` | Every job Claude has read, with its verdict and the main reason it isn't higher |
 | `jobstream assess --again` | Claude re-reads jobs it assessed under older rules (`--all`: every one, e.g. after you change your profile) |
+| `jobstream budget` | What Claude has cost today; set the daily budget, applications a day and models |
 | `jobstream dashboard` | The dashboard with buttons: Apply, Pack, Skip, Mark applied (`--lan` for your phone) |
 | `jobstream grow` | Your skill gaps; `--plan` writes a two-week project plan for the top one |
 | `jobstream health` | Is every job source still working? |
@@ -190,9 +191,26 @@ Set `apply.mode` in `config/settings.yaml`, or pass `--mode`:
   - the advert is from a recruitment agency, or the employer isn't confirmed on the sponsor
     register (use **Apply anyway** if you're sure).
 
-  It is limited by `max_applications_per_day` (10) and `max_per_company_per_30_days` (2),
+  It is limited by `max_applications_per_day` (3) and `max_per_company_per_30_days` (2),
   because spraying one company looks bad to its recruiters. Scheduled runs use a hidden
   browser; a click on the dashboard shows the browser so you can watch.
+
+## What it costs
+
+Claude is the only paid part. Rough costs at list prices:
+
+| Action | Model | Approx. |
+|---|---|---|
+| Assess one job | Sonnet 5.5 (`llm.assess_model`) | $0.02-0.03 |
+| Pack or application (CV, letter, form answers, networking plan) | Opus 5.5 (`llm.model`) | $0.50-0.70 |
+| Interview prep with web research | Opus 5.5 | $0.50-1.00 |
+
+With the defaults (25 assessments and up to 3 applications a day) a normal day is about $2-3.
+`llm.daily_budget_usd` (default $3) is a hard stop: once today's estimated spend reaches it,
+JobStream stops calling Claude until tomorrow. Searching and scoring carry on, and jobs it
+didn't get to wait for the next day. `jobstream budget` shows today's spend by task and changes
+the settings (`--daily 3 --applications 3 --assess-model sonnet`). The dashboard's sidebar shows
+today's spend too. Set a monthly limit in the Claude Console as well, as a backstop.
 
 ## How it decides what's worth your time
 
@@ -435,6 +453,7 @@ jobstream/
   growth.py         skill gaps and two-week project plans
   dashboard.py      the dashboard and its local server (buttons call actions.py)
   actions.py        what the dashboard buttons do; slow ones run on a background queue
+  spend.py          the cost of each Claude call, and the daily budget
   health.py         per-source run history and breakage detection
 config/             example profile and master CV (copy them with `jobstream init`)
 data/seed_companies.yaml   starting list of employers' job boards

@@ -11,7 +11,7 @@ from typing import Callable, Optional
 from . import digest, insights, notify
 from .config import CACHE_DIR, DATA_DIR, Context
 from .db import DB
-from .llm import LLM, LLMError
+from .llm import LLM, BudgetReached, LLMError
 from .matching import quick_title_filter, score_job
 from .models import Job
 from .sources import AGGREGATORS, ATS
@@ -219,6 +219,10 @@ def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = 
                 if a.verdict == "skip":
                     db.conn.execute("UPDATE jobs SET status='skipped' WHERE uid=?", (r["uid"],))
                 n += 1
+            except BudgetReached as e:
+                if not got.get("budget"):
+                    got["budget"] = 1
+                    say(f"  {e}. The rest are assessed tomorrow.")
             except LLMError as e:
                 say(f"  assessment failed: {e}")
     db.commit()
@@ -318,6 +322,9 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
         from .apply import prepare_and_apply
 
         for r in best:
+            if llm and llm.over_budget():
+                say(f"Today's Claude budget (${llm.budget_usd:.2f}) is used up: the other matches wait for tomorrow.")
+                break
             say(f"Preparing {r['title']} at {r['company']}...")
             try:
                 out = prepare_and_apply(db, ctx, llm, r["uid"], mode=mode)
@@ -363,6 +370,7 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
     notes = st.errors[:10]
     if llm:
         notes.append(f"Claude usage this run: {llm.usage_summary()}")
+        say(f"Claude: {llm.usage_summary()}")
     md, path = digest.build(db, ctx, ins, st.new, notes)
     say(f"Digest written to {path}")
     top_titles = [f"{r['company']}: {r['title']}" for r in best[:3]]

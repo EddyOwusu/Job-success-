@@ -37,4 +37,5 @@ def assess(llm: LLM, ctx: Context, job: Job, sponsor_name: str | None) -> FitAss
         prompt=job_block(job, sponsor_name) + "\n" + task,
         schema=FitAssessment,
         effort=ctx.settings["llm"]["assess_effort"],
+        model=ctx.settings["llm"].get("assess_model") or None,
     )
