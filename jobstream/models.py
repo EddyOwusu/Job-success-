@@ -38,6 +38,12 @@ class Targets(BaseModel):
     exclude_companies: list[str] = Field(default_factory=list)
     dream_companies: list[str] = Field(default_factory=list)
 
+    @property
+    def anywhere(self) -> bool:
+        """True when the person will work anywhere in the UK ("Anywhere in the UK" in locations, or none listed)."""
+        places = [l for l in self.locations if "remote" not in l.lower()]
+        return not places or any("anywhere" in l.lower() for l in places)
+
 
 class Skill(BaseModel):
     name: str

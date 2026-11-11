@@ -94,7 +94,11 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
 
     # 2) job-board searches (Reed, Adzuna, NHS Jobs, jobs.ac.uk) with your search queries
     queries = ctx.profile.targets.search_queries or ctx.profile.targets.roles
-    locations = [l for l in ctx.profile.targets.locations if "remote" not in l.lower()][:3] or [""]
+    # Reed and Adzuna search by place; "Anywhere in the UK" (or no places listed) searches the whole country
+    if ctx.profile.targets.anywhere:
+        locations = [""]
+    else:
+        locations = [l for l in ctx.profile.targets.locations if "remote" not in l.lower()][:3] or [""]
     for name, mod in AGGREGATORS.items():
         if not srcs.get(name) or not mod.available():
             continue

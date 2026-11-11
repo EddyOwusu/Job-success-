@@ -82,3 +82,15 @@ def test_is_uk():
     assert not is_uk("Cambridge, MA")
     assert is_uk("New York, NY; London, UK")
     assert not is_uk("Remote; Europe; European Union; Poland")
+
+
+def test_anywhere_in_the_uk(profile, settings):
+    from jobstream.matching import score_location
+    leeds = job(location="Leeds, UK")
+    assert score_location(leeds, profile) < 1.0              # example profile lists specific cities
+    profile.targets.locations = ["Anywhere in the UK", "Remote (UK)"]
+    assert profile.targets.anywhere and score_location(leeds, profile) == 1.0
+    profile.targets.locations = ["Remote (UK)"]
+    assert profile.targets.anywhere                          # no places listed means anywhere
+    profile.targets.locations = ["London", "Remote (UK)"]
+    assert not profile.targets.anywhere

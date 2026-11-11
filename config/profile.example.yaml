@@ -36,6 +36,7 @@ targets:
   seniority: [junior, mid]
   years_experience: 3
   # Places you can work. "Remote (UK)" means fully remote inside the UK.
+  # Use [Anywhere in the UK, Remote (UK)] to search and score every UK location equally.
   locations: [London, Manchester, Cambridge, Remote (UK)]
   remote_ok: true
   hybrid_ok: true

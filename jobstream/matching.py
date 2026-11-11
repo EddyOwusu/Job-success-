@@ -111,6 +111,8 @@ def score_location(job: Job, profile: Profile) -> float:
     loc = (job.location or "").lower()
     if job.remote == "remote" or "remote" in loc:
         return 1.0 if profile.targets.remote_ok else 0.3
+    if profile.targets.anywhere:
+        return 1.0          # any UK location suits (non-UK jobs are filtered out before scoring)
     for target in profile.targets.locations:
         city = target.lower().split("(")[0].strip()
         if city and city != "remote" and city in loc:
