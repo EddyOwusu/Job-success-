@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -128,11 +129,15 @@ def same_place(a: str, b: str) -> bool:
     return sa <= sb or sb <= sa or pa[0] == pb[0]
 
 
-def fingerprint(company: str, title: str) -> str:
-    import re
+_LEGAL = re.compile(r"\b(ltd|limited|plc|llp|llc|inc|incorporated|company|corp|corporation|group|holdings|uk|gb)\b")
 
-    norm = lambda s: re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
-    return f"{norm(company)}|{norm(title)}"
+
+def fingerprint(company: str, title: str) -> str:
+    """Duplicate key: "Renishaw PLC" and "Renishaw", or "Candour Solutions Limited" and "Candour Solutions",
+    are the same employer."""
+    norm = lambda s: re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", (s or "").lower())).strip()
+    name = re.sub(r"\s+", " ", _LEGAL.sub(" ", norm(company))).strip() or norm(company)
+    return f"{name}|{norm(title)}"
 
 
 class DB:
@@ -201,6 +206,10 @@ class DB:
         """Remove adverts stored twice (same employer, title and place from different boards), keeping the
         first one seen. Jobs you have packed or applied to are never removed."""
         removed = 0
+        # Recompute keys first, so rows stored by older versions match on the current rules
+        for uid, company, title, fp in self.conn.execute("SELECT uid, company, title, fingerprint FROM jobs").fetchall():
+            if fingerprint(company, title) != fp:
+                self.conn.execute("UPDATE jobs SET fingerprint=? WHERE uid=?", (fingerprint(company, title), uid))
         groups = self.conn.execute("SELECT fingerprint FROM jobs GROUP BY fingerprint HAVING COUNT(*) > 1").fetchall()
         for (fp,) in groups:
             rows = self.conn.execute("SELECT uid, location, status FROM jobs WHERE fingerprint=? ORDER BY first_seen, uid",

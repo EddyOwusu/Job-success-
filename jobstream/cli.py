@@ -195,6 +195,20 @@ def cmd_list(a):
         for r in rows:
             print(f"{r['score'] or 0:>5.0f}  {r['status']:<11} {r['company'][:22]:<22} {r['title'][:48]:<48} {r['uid']}")
         return
+    if a.assessed:
+        rows = db.jobs("assessment_json IS NOT NULL", order="fit_score DESC", limit=a.limit)
+        if not rows:
+            print("Claude hasn't assessed any jobs yet. Run `jobstream assess` (or `jobstream run`).")
+            return
+        print(f"{'fit':>4}  {'verdict':<22} {'company':<20} {'title':<40} id")
+        for r in rows:
+            v = json.loads(r["assessment_json"])
+            print(f"{r['fit_score'] or 0:>4.0f}  {v.get('verdict', '?'):<22} {r['company'][:20]:<20} {r['title'][:40]:<40} {r['uid']}")
+            why = (v.get("red_flags") or []) + (v.get("gaps") or [])
+            if why:
+                print(f"      why not higher: {why[0][:110]}")
+        print("\nFull reasoning for one job: jobstream show <id>")
+        return
     if a.status:
         where, params = "status=?", [a.status]
     else:
@@ -607,6 +621,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("list", help="show the shortlist and pipeline")
     s.add_argument("--status", choices=STATUSES)
     s.add_argument("--scaleup", action="store_true", help="only jobs at Scale-up sponsors")
+    s.add_argument("--assessed", action="store_true", help="every job Claude has read, with its verdict and why")
     s.add_argument("--limit", type=int, default=30)
     s.set_defaults(fn=cmd_list)
     s = sub.add_parser("show", help="details of one job")

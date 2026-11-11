@@ -28,7 +28,17 @@ KNOWN = {
     "gattaca", "redline group", "talent international", "oho group", "wilson worldwide", "prospect us",
     "senitor associates", "deerfoot it", "x4 group", "trinnovo", "spectrum it", "carrington blake",
     "henderson scott", "you recruit", "allen associates", "cathcart associates", "hireful",
+    # seen on real runs
+    "reed", "oscar technology", "mcs group", "candour solutions", "nexus jobs", "jumar solutions",
+    "akt", "lawrence harvey", "franklin fitch", "client server", "ic resources", "evolution jobs",
 }
+
+# Words a recruiter adds after its name for a division ("Hays Technology", "Reed Technology",
+# "Randstad Digital", "Adecco IT"). A known single-word name only counts when followed by these.
+_DIVISION = {"technology", "technologies", "tech", "it", "digital", "specialist", "specialists", "professional",
+             "professionals", "solutions", "talent", "people", "careers", "jobs", "consulting", "associates",
+             "partners", "selection", "search", "interim", "contract", "contracts", "engineering", "cyber",
+             "data", "life", "sciences", "public", "sector", "education", "healthcare", "permanent"}
 
 
 def _norm(name: str) -> str:
@@ -45,5 +55,15 @@ def is_agency(company: str, extra: dict | None = None) -> bool:
     if _WORDS.search(company or ""):
         return True
     n = _norm(company)
-    # exact name, or a known multi-word name followed by more words ("robert half technology")
-    return bool(n) and (n in _KNOWN_N or any(n.startswith(k + " ") for k in _KNOWN_N if " " in k))
+    if not n:
+        return False
+    if n in _KNOWN_N:
+        return True
+    for k in _KNOWN_N:
+        if n.startswith(k + " "):
+            rest = n[len(k) + 1:].split()
+            # "robert half technology": any tail after a multi-word name;
+            # "hays technology": a single-word name only with a division word after it
+            if " " in k or all(w in _DIVISION for w in rest):
+                return True
+    return False

@@ -81,3 +81,27 @@ def test_agency_jobs_get_no_sponsor_credit(profile, settings):
     agency = score_job(j, profile, settings, sp, agency=True)
     assert agency.sponsorship < 0.3 < direct.sponsorship
     assert not agency.blockers and any("recruitment agency" in n for n in agency.notes)
+
+
+def test_legal_suffixes_do_not_split_duplicates(tmp_path):
+    from jobstream.db import fingerprint
+    assert fingerprint("Renishaw PLC", "IT Support") == fingerprint("Renishaw", "IT  support")
+    assert fingerprint("Candour Solutions Limited", "x") == fingerprint("Candour Solutions", "x")
+    assert fingerprint("Co-op", "x") != fingerprint("Op", "x")           # "co" is not a legal suffix
+    db = DB(tmp_path / "s.db")
+    # rows stored with the old key are re-keyed and merged
+    for i, co in enumerate(["Renishaw", "Renishaw PLC"]):
+        db.conn.execute("INSERT INTO jobs (uid, source, source_id, company, title, location, fingerprint, first_seen, status) "
+                        "VALUES (?,?,?,?,?,?,?,?,?)", (f"r:{i}", "r", str(i), co, "IT Analyst", "Wotton-under-Edge",
+                                                       co.lower() + "|it analyst", f"2026-11-1{i}", "shortlisted"))
+    db.commit()
+    assert db.merge_duplicates() == 1 and [r["uid"] for r in db.jobs()] == ["r:0"]
+
+
+def test_recruiter_divisions_are_agencies():
+    from jobstream.agencies import is_agency
+    for name in ["Hays Technology", "Reed Technology", "Oscar Technology", "Reed", "MCS Group", "Randstad Digital",
+                 "Civic Recruitment Limited", "VIQU Limited"]:
+        assert is_agency(name), name
+    for name in ["Reed Elsevier", "Hays Travel", "Renishaw PLC", "BDO", "Giacom", "East Suffolk Council", "Oscar Health"]:
+        assert not is_agency(name), name

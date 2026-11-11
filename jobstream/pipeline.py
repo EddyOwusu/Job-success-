@@ -291,7 +291,7 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
                               "ORDER BY fit_score DESC LIMIT 1").fetchone() if llm else None
         if top:
             say(f"No job reached a Claude fit of {thr}, so no packs were built. Best so far: {top['fit_score']:.0f} for "
-                f"{top['title']} at {top['company']}. See them with `jobstream list`; build one anyway with "
+                f"{top['title']} at {top['company']}. See every verdict and the reasons with `jobstream list --assessed`; build one anyway with "
                 f"`jobstream apply <id> --mode pack`, or lower scoring.apply_threshold in config/settings.yaml.")
     if best and mode != "none":
         from .apply import prepare_and_apply
