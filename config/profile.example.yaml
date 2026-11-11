@@ -16,6 +16,7 @@ personal:
   github: https://github.com/your-handle
   portfolio: ""                    # optional personal site
   pronouns: ""                     # optional, only used if a form asks
+  driving_licence: ""              # e.g. "Full UK", "Ghanaian, exchangeable", "None". Many field and multi-site IT jobs ask
 
 # What you are looking for --------------------------------------------------
 targets:

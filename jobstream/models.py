@@ -18,6 +18,7 @@ class Personal(BaseModel):
     github: str = ""
     portfolio: str = ""
     pronouns: str = ""
+    driving_licence: str = ""     # e.g. "Full UK", "Ghanaian (exchangeable)", "None". Blank = not stated
 
     @property
     def full_name(self) -> str:

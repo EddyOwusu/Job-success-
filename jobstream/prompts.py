@@ -62,6 +62,8 @@ URL: {job.url}
 {extra}"""
 
 
+ASSESS_RULES = 2          # bump when the assessment rules change; `assess --again` redoes older ones
+
 ASSESS_TASK = """Assess this job for the candidate.
 
 Think like an experienced UK tech recruiter. Consider:

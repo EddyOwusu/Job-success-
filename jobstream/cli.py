@@ -181,8 +181,15 @@ def cmd_assess(a):
         return 1
     if a.again:
         # Claude reads the jobs it already assessed again, e.g. after the rules or your profile changed
+        from .prompts import ASSESS_RULES
         rows = db.jobs("assessment_json IS NOT NULL AND status IN ('shortlisted','skipped')",
-                       order="COALESCE(fit_score, 0) DESC", limit=a.limit or ctx.settings["llm"]["max_assessments_per_run"])
+                       order="COALESCE(fit_score, 0) DESC", limit=5000)
+        if not a.all:   # only those read under older rules
+            rows = [r for r in rows if json.loads(r["assessment_json"]).get("rules", 1) < ASSESS_RULES]
+        rows = rows[: a.limit or ctx.settings["llm"]["max_assessments_per_run"]]
+        if not rows:
+            print("Every assessment already uses the current rules (add --all to redo them anyway).")
+            return
         for r in rows:
             db.conn.execute("UPDATE jobs SET assessment_json=NULL, fit_score=NULL, status='shortlisted' WHERE uid=?",
                             (r["uid"],))
@@ -211,13 +218,18 @@ def cmd_list(a):
         if not rows:
             print("Claude hasn't assessed any jobs yet. Run `jobstream assess` (or `jobstream run`).")
             return
+        from .prompts import ASSESS_RULES
         print(f"{'fit':>4}  {'verdict':<22} {'company':<20} {'title':<40} id")
         for r in rows:
             v = json.loads(r["assessment_json"])
             print(f"{r['fit_score'] or 0:>4.0f}  {v.get('verdict', '?'):<22} {r['company'][:20]:<20} {r['title'][:40]:<40} {r['uid']}")
             why = (v.get("red_flags") or []) + (v.get("gaps") or [])
             if why:
-                print(f"      why not higher: {why[0][:110]}")
+                import textwrap
+                lines = textwrap.wrap(why[0], 96, max_lines=3, placeholder=" ...")
+                print("      why not higher: " + ("\n" + " " * 22).join(lines))
+            if v.get("rules", 1) < ASSESS_RULES:
+                print("      (read under older rules: `jobstream assess --again` refreshes it)")
         print("\nFull reasoning for one job: jobstream show <id>")
         return
     if a.status:
@@ -628,7 +640,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("search", help="fetch and score jobs").set_defaults(fn=cmd_search)
     s = sub.add_parser("assess", help="deep Claude assessment of the shortlist")
     s.add_argument("--limit", type=int, default=None)
-    s.add_argument("--again", action="store_true", help="re-assess jobs Claude already read (after a rule or profile change)")
+    s.add_argument("--again", action="store_true", help="re-assess jobs Claude read under older rules")
+    s.add_argument("--all", action="store_true", help="with --again: redo every assessment (e.g. after a profile change)")
     s.set_defaults(fn=cmd_assess)
     s = sub.add_parser("list", help="show the shortlist and pipeline")
     s.add_argument("--status", choices=STATUSES)

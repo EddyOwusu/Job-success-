@@ -19,9 +19,16 @@ def assess(llm: LLM, ctx: Context, job: Job, sponsor_name: str | None) -> FitAss
     if ctx.profile.visa.willing_to_relocate and t.anywhere:
         note += (" The candidate will relocate anywhere in the UK, so the job's location and onsite work are not a "
                  "weakness.")
+    if not ctx.profile.personal.driving_licence:
+        note += (" Whether the candidate holds a driving licence is not stated: if the advert requires one, say so as "
+                 "a question to check, not as a gap.")
     from .sponsors import core_name
     here = core_name(job.company)
-    if here and any(core_name(r.company) == here for r in ctx.cv.experience if r.end in ("", "present")):
+    def same_employer(cv_company: str) -> bool:      # "Bupa Care Services, Hadley Lawns" is Bupa
+        c = core_name(cv_company.split(",")[0])
+        return c == here or c.startswith(here + " ") or here.startswith(c + " ")
+
+    if here and any(same_employer(r.company) for r in ctx.cv.experience if r.end in ("", "present")):
         note += (f" The candidate already works for {job.company} (see the master CV): an internal applicant, which is a "
                  "real advantage. A move into a different occupation still needs a new certificate of sponsorship.")
     task = ASSESS_TASK.format(threshold=sp["general_threshold_gbp"], new_entrant=sp["new_entrant_threshold_gbp"]) + "\n" + note

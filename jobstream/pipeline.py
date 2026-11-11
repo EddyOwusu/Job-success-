@@ -214,7 +214,8 @@ def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = 
                 # SQLite is written from this thread only
                 db.conn.execute("UPDATE jobs SET description=?, extra=? WHERE uid=?",
                                 (job.description, json.dumps(job.extra), r["uid"]))
-                db.set_assessment(r["uid"], a.fit_score, a.model_dump_json())
+                from .prompts import ASSESS_RULES
+                db.set_assessment(r["uid"], a.fit_score, json.dumps({**a.model_dump(), "rules": ASSESS_RULES}))
                 if a.verdict == "skip":
                     db.conn.execute("UPDATE jobs SET status='skipped' WHERE uid=?", (r["uid"],))
                 n += 1
