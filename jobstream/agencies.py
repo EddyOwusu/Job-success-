@@ -30,7 +30,7 @@ KNOWN = {
     "henderson scott", "you recruit", "allen associates", "cathcart associates", "hireful",
     # seen on real runs
     "reed", "oscar technology", "mcs group", "candour solutions", "nexus jobs", "jumar solutions",
-    "akt", "lawrence harvey", "franklin fitch", "client server", "ic resources", "evolution jobs",
+    "akt", "hackajob", "centre people", "lawrence harvey", "franklin fitch", "client server", "ic resources", "evolution jobs",
 }
 
 # Words a recruiter adds after its name for a division ("Hays Technology", "Reed Technology",

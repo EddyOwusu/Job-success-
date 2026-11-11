@@ -194,13 +194,17 @@ def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = 
     n = 0
     from . import fulltext
 
+    got = {"tried": 0, "found": 0}
+
     def one(r):
         job = db.row_to_job(r)
-        if not job.extra.get("full_text_tried"):
+        if not job.extra.get("full_text_tried") and len(job.description or "") < fulltext.SHORT:
             text = fulltext.fetch(job)
             job.extra["full_text_tried"] = True
+            got["tried"] += 1
             if text:
                 job.description = text
+                got["found"] += 1
         return r, job, assess(llm, ctx, job, r["sponsor_match"])
 
     with cf.ThreadPoolExecutor(4) as ex:
@@ -217,6 +221,8 @@ def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = 
             except LLMError as e:
                 say(f"  assessment failed: {e}")
     db.commit()
+    if got["tried"]:
+        say(f"  Full advert text found for {got['found']} of {got['tried']} short adverts.")
     return n
 
 
