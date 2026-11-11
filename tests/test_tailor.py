@@ -52,3 +52,15 @@ def test_answers(profile, cv, settings):
     assert fa.answers[0].answer == "Yes"
     assert fa.answers[1].answer == "No"
     assert fa.answers[2].needs_human
+
+
+def test_guard_keeps_honest_variants_of_your_skills(profile, cv):
+    skills = [s.name for s in profile.skills]
+    assert "Python" in skills and "AWS" in skills
+    t = TailoredCV(headline="Backend Engineer", summary="Building Python services since 2021.",
+                   skills=["Python (Django, FastAPI)", "AWS (cloud)", "Kubernetes (EKS)", "Python (Kubernetes)"],
+                   experience=[], projects=[], education=[], certifications=[])
+    t, warnings = guard(t, profile, cv)
+    assert t.skills == ["Python (Django, FastAPI)", "AWS (cloud)"]
+    assert t.summary == "Building Python services since 2021."          # "2021." is the year 2021
+    assert any("Kubernetes (EKS)" in w for w in warnings)

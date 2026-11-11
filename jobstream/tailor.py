@@ -24,7 +24,8 @@ def _source_text(profile: Profile, cv: MasterCV) -> str:
 
 
 def _numbers(text: str) -> set[str]:
-    return {n.replace(",", "") for n in re.findall(r"\d[\d,.]*", text or "") if any(c.isdigit() for c in n)}
+    # "2026." at the end of a sentence is 2026
+    return {n.replace(",", "").rstrip(".") for n in re.findall(r"\d[\d,.]*", text or "") if any(c.isdigit() for c in n)}
 
 
 def guard(tailored: TailoredCV, profile: Profile, cv: MasterCV) -> tuple[TailoredCV, list[str]]:
@@ -36,9 +37,20 @@ def guard(tailored: TailoredCV, profile: Profile, cv: MasterCV) -> tuple[Tailore
         s.lower() for s in extract_skills(source)
     }
 
+    def skill_ok(s: str) -> bool:
+        if canonical(s).lower() in known_skills or s.lower() in source:
+            return True
+        # "Microsoft 365 (Office 365)", "Networking (DNS, routers)": every skill named is one you have
+        named = {x.lower() for x in extract_skills(s)}
+        if named and named <= known_skills and canonical(s.split("(")[0].strip()).lower() in known_skills | named:
+            return True
+        # "Hardware and device setup": every word is in your CV
+        words = [w for w in re.findall(r"[a-z0-9]{3,}", s.lower()) if w not in ("and", "the", "for", "with")]
+        return bool(words) and all(w in source for w in words)
+
     skills = []
     for s in tailored.skills:
-        if canonical(s).lower() in known_skills or s.lower() in source:
+        if skill_ok(s):
             skills.append(s)
         else:
             warnings.append(f"Removed skill not in your profile: {s}")
