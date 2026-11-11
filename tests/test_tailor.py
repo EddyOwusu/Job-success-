@@ -64,3 +64,17 @@ def test_guard_keeps_honest_variants_of_your_skills(profile, cv):
     assert t.skills == ["Python (Django, FastAPI)", "AWS (cloud)"]
     assert t.summary == "Building Python services since 2021."          # "2021." is the year 2021
     assert any("Kubernetes (EKS)" in w for w in warnings)
+
+
+def test_guard_keeps_two_roles_at_one_company(profile, cv):
+    from jobstream.models import Role
+    co = "Acme Care Ltd"
+    cv.experience[:0] = [Role(company=co, title="IT Consultant", start="2025-07", end="2026-09",
+                              bullets=[{"text": "Resolved staff tickets in Zendesk", "tags": ["ticketing"]}]),
+                         Role(company=co, title="Support Worker", start="2025-04", end="2025-06", kind="other")]
+    t = TailoredCV(headline="x", summary="y", skills=[], projects=[], education=[], certifications=[],
+                   experience=[TailoredRole(company=co, title="IT Support Consultant", location="", start="2025-07",
+                                            end="2026-09", bullets=["Resolved staff tickets in Zendesk"])])
+    t, _ = guard(t, profile, cv)
+    acme = [(r.title, r.start, r.kind) for r in t.experience if r.company == co]
+    assert acme == [("IT Consultant", "2025-07", "main"), ("Support Worker", "2025-04", "other")]

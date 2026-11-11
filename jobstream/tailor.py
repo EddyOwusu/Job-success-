@@ -56,15 +56,28 @@ def guard(tailored: TailoredCV, profile: Profile, cv: MasterCV) -> tuple[Tailore
             warnings.append(f"Removed skill not in your profile: {s}")
     tailored.skills = list(dict.fromkeys(skills))
 
-    by_company = {r.company.lower(): r for r in cv.experience}
-    roles = []
+    # A company can appear twice (e.g. promoted: "Support Worker" then "IT Consultant"), so roles are matched
+    # on company and start date, then company and title, then the first unused role at that company.
+    used: set[int] = set()
+
+    def source_role(r: TailoredRole) -> int | None:
+        same = [i for i, x in enumerate(cv.experience) if x.company.lower() == r.company.lower() and i not in used]
+        for test in (lambda x: x.start == r.start, lambda x: x.title.lower() == r.title.lower(), lambda x: True):
+            hit = next((i for i in same if test(cv.experience[i])), None)
+            if hit is not None:
+                return hit
+        return None
+
+    roles: list[tuple[int, TailoredRole]] = []
     for r in tailored.experience:
-        src = by_company.get(r.company.lower())
-        if not src:
+        i = source_role(r)
+        if i is None:
             warnings.append(f"Removed role not in your master CV: {r.title} at {r.company}")
             continue
+        used.add(i)
+        src = cv.experience[i]
         r.title, r.start, r.end, r.location = src.title, src.start, src.end, src.location or r.location
-        r.kind = src.kind
+        r.company, r.kind = src.company, src.kind
         bullets = []
         for b in r.bullets:
             invented = _numbers(b) - source_numbers
@@ -73,15 +86,14 @@ def guard(tailored: TailoredCV, profile: Profile, cv: MasterCV) -> tuple[Tailore
             else:
                 bullets.append(b)
         r.bullets = bullets or ([] if src.kind == "other" else [x.text for x in src.bullets[:3]])
-        roles.append(r)
+        roles.append((i, r))
     # never silently lose a job from the history (gaps raise questions)
-    present = {r.company.lower() for r in roles}
-    for src in cv.experience:
-        if src.company.lower() not in present:
-            roles.append(TailoredRole(company=src.company, title=src.title, location=src.location, kind=src.kind,
-                                      start=src.start, end=src.end, bullets=[b.text for b in src.bullets[:2]]))
-    order = {r.company.lower(): i for i, r in enumerate(cv.experience)}
-    tailored.experience = sorted(roles, key=lambda r: order.get(r.company.lower(), 99))
+    for i, src in enumerate(cv.experience):
+        if i not in used:
+            roles.append((i, TailoredRole(company=src.company, title=src.title, location=src.location, kind=src.kind,
+                                          start=src.start, end=src.end,
+                                          bullets=[] if src.kind == "other" else [b.text for b in src.bullets[:2]])))
+    tailored.experience = [r for _, r in sorted(roles, key=lambda x: x[0])]
 
     def _supported(line: str) -> bool:
         words = [w for w in re.findall(r"[a-z]{4,}", line.lower())]

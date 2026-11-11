@@ -28,7 +28,9 @@ def split_roles(cv: TailoredCV):
     """(main roles, other-employment roles)."""
     main = [r for r in cv.experience if getattr(r, "kind", "main") != "other"]
     other = [r for r in cv.experience if getattr(r, "kind", "main") == "other"]
-    return main, other
+    # newest first, current jobs at the top
+    key = lambda r: ("9999" if (r.end or "").lower() in ("", "present", "now", "current") else r.end, r.start or "")
+    return main, sorted(other, key=key, reverse=True)
 
 
 def other_line(r) -> str:
