@@ -28,10 +28,17 @@ def search(query: str, location: str = "", max_results: int = 100, details: int 
                and not (want and not want(r.get("jobTitle", "")))]
     for i, r in enumerate(results):
         desc = r.get("jobDescription", "") or ""
+        lo, hi = r.get("minimumSalary"), r.get("maximumSalary")
+        apply_url, extra = r.get("jobUrl", ""), {}
         if i < details:  # the search result only has a snippet
             det = get_json(f"{API}/jobs/{r['jobId']}", auth=auth, min_interval=0.5) or {}
             from ..text import html_to_text
             desc = html_to_text(det.get("jobDescription", "")) or desc
+            # yearly figures, so a day rate is never mistaken for a salary
+            if det.get("yearlyMinimumSalary") or det.get("yearlyMaximumSalary"):
+                lo, hi = det.get("yearlyMinimumSalary"), det.get("yearlyMaximumSalary")
+            apply_url = det.get("externalUrl") or apply_url
+            extra = {"contract": det.get("contractType"), "salary_type": det.get("salaryType")}
         # Reed dates are dd/mm/yyyy
         posted = None
         if r.get("date"):
@@ -40,9 +47,9 @@ def search(query: str, location: str = "", max_results: int = 100, details: int 
         jobs.append(Job(
             source="reed", source_id=str(r["jobId"]), company=r.get("employerName", "").strip(),
             title=r.get("jobTitle", "").strip(), location=r.get("locationName", ""),
-            url=r.get("jobUrl", ""), apply_url=r.get("jobUrl", ""), description=desc,
-            salary_min=r.get("minimumSalary"), salary_max=r.get("maximumSalary"),
+            url=r.get("jobUrl", ""), apply_url=apply_url, description=desc,
+            salary_min=lo, salary_max=hi,
             remote=work_mode(r.get("locationName", ""), desc[:500]), posted_at=posted,
-            extra={"recruiter": r.get("employerName"), "applications": r.get("applications")},
+            extra={"recruiter": r.get("employerName"), "applications": r.get("applications"), **extra},
         ))
     return jobs
