@@ -44,6 +44,7 @@ def _job(r) -> dict:
         "why": (a.get("strengths") or [None])[0], "flag": (a.get("red_flags") or [None])[0],
         "alerted": bool(r["alerted_at"]) and (_days_since(r["alerted_at"]) or 0) <= 2,
         "attempt": extra.get("apply_attempt"), "apply_url": r["apply_url"] or r["url"],
+        "networked": bool(extra.get("networking_at")),
     }
 
 

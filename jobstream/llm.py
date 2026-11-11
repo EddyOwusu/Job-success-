@@ -21,6 +21,30 @@ class BudgetReached(LLMError):
     """Today's Claude budget is spent: callers fall back to their no-Claude path."""
 
 
+def json_schema(schema: type[BaseModel]) -> dict:
+    """The JSON schema the API's structured outputs accept, for a Pydantic model."""
+    try:
+        from anthropic import transform_schema       # the SDK's own converter (newer SDKs)
+        return transform_schema(schema)
+    except ImportError:
+        pass
+
+    def strict(node):
+        if isinstance(node, dict):
+            if node.get("type") == "object" and "properties" in node:
+                node["additionalProperties"] = False
+                node["required"] = list(node["properties"])
+            for k in ("default", "title"):
+                node.pop(k, None)
+            for v in node.values():
+                strict(v)
+        elif isinstance(node, list):
+            for v in node:
+                strict(v)
+        return node
+    return strict(schema.model_json_schema())
+
+
 class LLM:
     """Structured calls to Claude. One instance per run."""
 
@@ -148,6 +172,63 @@ class LLM:
         except a.APIConnectionError as e:
             raise LLMError("Could not reach the Claude API (network problem)") from e
         return "".join(text_parts).strip(), [(t, u) for u, t in sources.items()]
+
+    # ------------------------------------------------------------------ batches (half price, results within hours)
+    def batch_submit(self, items: list[tuple[str, str, str]], schema: type[BaseModel], effort: str = "medium",
+                     model: Optional[str] = None, max_tokens: int = 16000) -> str:
+        """Send many structured requests as one Message Batch. items: (custom_id, system, prompt).
+        Returns the batch id. Batches can't use server-side fallbacks, so a declined request just fails
+        and is tried again later."""
+        a = self.anthropic
+        model = model or self.model
+        self._check_budget()
+        fmt = {"type": "json_schema", "schema": json_schema(schema)}
+        requests = [{"custom_id": cid, "params": {
+            "model": model, "max_tokens": max_tokens,
+            "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+            "messages": [{"role": "user", "content": prompt}],
+            "thinking": {"type": "adaptive"},
+            "output_config": {"effort": effort, "format": fmt},
+        }} for cid, system, prompt in items]
+        try:
+            return self.client.messages.batches.create(requests=requests).id
+        except a.APIStatusError as e:
+            raise LLMError(f"Claude batch was rejected ({e.status_code}): {e.message}") from e
+        except a.APIConnectionError as e:
+            raise LLMError("Could not reach the Claude API (network problem)") from e
+
+    def batch_status(self, batch_id: str) -> str:
+        """'in_progress', 'canceling' or 'ended'."""
+        return self.client.messages.batches.retrieve(batch_id).processing_status
+
+    def batch_results(self, batch_id: str, schema: type[T], model: Optional[str] = None
+                      ) -> list[tuple[str, Optional[T], str]]:
+        """[(custom_id, parsed or None, error)] for an ended batch. Charges the ledger at batch prices."""
+        from .spend import cost
+        model = model or self.model
+        out: list[tuple[str, Optional[T], str]] = []
+        for item in self.client.messages.batches.results(batch_id):
+            res = item.result
+            if res.type != "succeeded":
+                out.append((item.custom_id, None, res.type))
+                continue
+            msg = res.message
+            if msg.usage:
+                self.input_tokens += msg.usage.input_tokens or 0
+                self.output_tokens += msg.usage.output_tokens or 0
+                usd = cost(getattr(msg, "model", None) or model, msg.usage) * 0.5     # batch discount
+                self.spent += usd
+                if self.ledger:
+                    self.ledger.add(usd, model, schema.__name__ + " (batch)")
+            if msg.stop_reason != "end_turn":
+                out.append((item.custom_id, None, msg.stop_reason or "no answer"))
+                continue
+            text = next((b.text for b in msg.content if b.type == "text"), "")
+            try:
+                out.append((item.custom_id, schema.model_validate_json(text), ""))
+            except ValueError as e:
+                out.append((item.custom_id, None, f"unreadable answer: {e.__class__.__name__}"))
+        return out
 
     def usage_summary(self) -> str:
         out = f"{self.input_tokens:,} input / {self.output_tokens:,} output tokens, about ${self.spent:.2f}"

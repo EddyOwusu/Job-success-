@@ -272,7 +272,7 @@ async function call(action, uid, value){
   if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
   return data;
 }
-const VERB = {apply: 'Applying', pack: 'Building the pack', interview: 'Building interview prep'};
+const VERB = {apply: 'Applying', pack: 'Building the pack', interview: 'Building interview prep', network: 'Finding people to contact'};
 function track(task){ tracked.set(task.id, task); toast(VERB[task.action] + '…', task.label, 'spin', task.id); if (!polling) polling = setInterval(poll, 2500); }
 async function poll(){
   let data; try { const r = await fetch(LIVE.api + '/tasks', {headers: {'X-JobStream': LIVE.csrf}}); data = await r.json(); } catch (e) { return; }
@@ -311,7 +311,8 @@ function appButtons(j){
   if (j.status === 'applied') { w.append(act('Interview', '', () => quick('status', j.uid, 'interview'), 'Got an interview: builds your prep pack'),
                                          act('Rejected', 'quiet', () => quick('status', j.uid, 'rejected'))); }
   else if (j.status === 'interview') { w.append(act('Offer', '', () => quick('status', j.uid, 'offer')), act('Rejected', 'quiet', () => quick('status', j.uid, 'rejected'))); }
-  if (LIVE.local) w.append(act('Pack', 'quiet', () => quick('open_pack', j.uid, '', false), 'Open the application pack'));
+  if (!j.networked) w.append(act('Network', 'quiet', () => quick('network', j.uid), 'Who to contact at ' + j.company + ' and what to say (uses Claude)'));
+  if (LIVE.local) w.append(act(j.networked ? 'Pack & contacts' : 'Pack', 'quiet', () => quick('open_pack', j.uid, '', false), 'Open the application pack'));
   return w;
 }
 const NS = 'http://www.w3.org/2000/svg';
@@ -446,7 +447,7 @@ function drawApps(){
   rows.forEach(j => { const tr = el('tr'), role = el('td', 'role'), t = el('div'); t.append(link(j.title, j.url)); role.append(t, el('div', 'm', [j.company, SECT[j.sector] || j.sector].join(' · ')));
     const when = el('td', 'nowrap'); when.append(el('div', null, day(j.applied_on) || '–'), el('div', 'muted', j.applied_days == null ? '' : j.applied_days === 0 ? 'today' : j.applied_days + ' days ago'));
     const s = STATUS[j.status] || [j.status, 'grey'], st = el('td'); st.append(badge(s[0], s[1]));
-    const next = el('td', 'hide-m', j.status === 'interview' ? 'Read your prep pack' : j.status === 'offer' ? 'Confirm sponsorship route and salary' : j.status === 'applied' ? (j.applied_days >= 4 ? 'Send a follow-up' : 'Wait, and send the networking messages') : '–');
+    const next = el('td', 'hide-m', j.status === 'interview' ? 'Read your prep pack' : j.status === 'offer' ? 'Confirm sponsorship route and salary' : j.status === 'applied' ? (j.applied_days >= 4 ? 'Send a follow-up' : j.networked ? 'Wait, and send the networking messages' : 'Wait. Network finds someone to message') : '–');
     if (next.textContent === '–') next.classList.add('muted');
     const act = el('td', 'r full'); act.append(LIVE ? appButtons(j) : cmd(j.status === 'interview' ? 'jobstream prep ' + short(j.uid) : 'jobstream show ' + short(j.uid)));
     tr.append(role, when, st, next, act); body.append(tr); });

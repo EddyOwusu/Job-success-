@@ -201,11 +201,23 @@ Claude is the only paid part. Rough costs at list prices:
 
 | Action | Model | Approx. |
 |---|---|---|
-| Assess one job | Sonnet 5.5 (`llm.assess_model`) | $0.02-0.03 |
-| Pack or application (CV, letter, form answers, networking plan) | Opus 5.5 (`llm.model`) | $0.50-0.70 |
+| Assess one job (daily run: as a batch, half price) | Sonnet 5.5 (`llm.assess_model`) | $0.01-0.03 |
+| Pack or application (CV, letter, form answers) | Opus 5.5 (`llm.model`) | $0.45-0.60 |
+| Networking plan, when you ask for one | Opus 5.5 | $0.05-0.10 |
 | Interview prep with web research | Opus 5.5 | $0.50-1.00 |
 
-With the defaults (25 assessments and up to 3 applications a day) a normal day is about $2-3.
+With the defaults (25 assessments and up to 3 applications a day) a normal day is about $1.50-2.50.
+
+**Batch assessments.** The daily run sends its assessments to Claude as one Message Batch, which
+costs half as much and usually finishes within minutes. It waits up to `llm.batch_wait_minutes`
+(20); results that arrive later are stored by the next quick check (11:30, 15:30 or 19:30), which
+then builds or sends the applications, within the day's allowance. `jobstream assess` (by hand)
+still answers straight away. Turn batches off with `llm.batch_assessments: false`.
+
+**Networking on demand.** Packs no longer include a networking plan by default
+(`apply.networking: on_demand`). Build one for the jobs that matter with `jobstream network <id>`
+or the **Network** button on the dashboard's Applications view; it's saved as `networking.md` in
+that job's pack. Set `apply.networking: always` for the old behaviour.
 `llm.daily_budget_usd` (default $3) is a hard stop: once today's estimated spend reaches it,
 JobStream stops calling Claude until tomorrow. Searching and scoring carry on, and jobs it
 didn't get to wait for the next day. `jobstream budget` shows today's spend by task and changes

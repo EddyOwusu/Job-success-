@@ -637,8 +637,11 @@ def cmd_network(a):
     if not r:
         print("No such job.")
         return 1
-    plan = networking.build_plan(_llm(ctx), ctx, db.row_to_job(r), r["sponsor_match"])
-    print(networking.plan_markdown(plan))
+    from .apply import build_networking
+    md, path = build_networking(db, ctx, _llm(ctx), r["uid"])
+    print(md)
+    if path:
+        print(f"\nSaved to {path}")
 
 
 def cmd_followups(a):
@@ -789,7 +792,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--days", type=int)
     s.set_defaults(fn=cmd_inbox)
     sub.add_parser("learn", help="what's working: interview rates by sector, source, score... and tuned scoring").set_defaults(fn=cmd_learn)
-    s = sub.add_parser("network", help="who to contact and what to say for a job")
+    s = sub.add_parser("network", help="who to contact and what to say for a job (saved into its pack)")
     s.add_argument("id")
     s.set_defaults(fn=cmd_network)
     s = sub.add_parser("followups", help="follow-ups that are due")

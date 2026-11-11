@@ -13,7 +13,7 @@ from .config import CACHE_DIR, DATA_DIR, Context
 from .db import DB
 from .llm import LLM, BudgetReached, LLMError
 from .matching import quick_title_filter, score_job
-from .models import Job
+from .models import FitAssessment, Job
 from .sources import AGGREGATORS, ATS
 from .sources.base import is_uk
 from .sponsors import SponsorRegister
@@ -169,10 +169,20 @@ def score_all(db: DB, ctx: Context, register: SponsorRegister, only_new: bool = 
     return n
 
 
+def _pending_batches(db: DB) -> list[dict]:
+    return db.get_learned("assess_batches", []) or []
+
+
+def _waiting_uids(db: DB) -> set[str]:
+    return {u for b in _pending_batches(db) for u in b["map"].values()}
+
+
 def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = None,
-               say: Callable[[str], None] = print, fresh_only: bool = False, uids: Optional[list[str]] = None) -> int:
+               say: Callable[[str], None] = print, fresh_only: bool = False, uids: Optional[list[str]] = None,
+               batch: bool = False) -> int:
     """Claude reads the best unassessed shortlisted jobs. fresh_only: just the new, alert-worthy ones.
-    uids: exactly these jobs."""
+    uids: exactly these jobs. batch: send them as one Message Batch (half price; results come later and
+    are stored by harvest_batches). Returns how many were assessed (or, with batch, sent)."""
     if not llm:
         return 0
     from .assess import assess
@@ -188,9 +198,13 @@ def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = 
         if rows:
             say(f"Claude is checking {len(rows)} fresh jobs before any 'apply today' alert...")
     else:
-        rows = db.jobs("status='shortlisted' AND assessment_json IS NULL", order="score DESC", limit=limit)
-        if rows:
+        waiting = _waiting_uids(db)
+        rows = [r for r in db.jobs("status='shortlisted' AND assessment_json IS NULL", order="score DESC",
+                                   limit=limit + len(waiting)) if r["uid"] not in waiting][:limit]
+        if rows and not batch:
             say(f"Claude is assessing the top {len(rows)} shortlisted jobs...")
+    if batch and rows:
+        return submit_batch(db, ctx, llm, rows, say)
     n = 0
     from . import fulltext
 
@@ -231,11 +245,149 @@ def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = 
     return n
 
 
+def _with_full_text(db: DB, r) -> Job:
+    from . import fulltext
+    job = db.row_to_job(r)
+    if not job.extra.get("full_text_tried") and len(job.description or "") < fulltext.SHORT:
+        text = fulltext.fetch(job)
+        job.extra["full_text_tried"] = True
+        if text:
+            job.description = text
+        db.conn.execute("UPDATE jobs SET description=?, extra=? WHERE uid=?",
+                        (job.description, json.dumps(job.extra), r["uid"]))
+    return job
+
+
+def submit_batch(db: DB, ctx: Context, llm: LLM, rows: list, say: Callable[[str], None] = print) -> int:
+    """Send assessments as one Message Batch at half price. harvest_batches() stores the results."""
+    from .assess import request
+    from .llm import BudgetReached
+    items, mapping = [], {}
+    for i, r in enumerate(rows):
+        job = _with_full_text(db, r)
+        system, prompt = request(ctx, job, r["sponsor_match"])
+        cid = f"j{i}"
+        items.append((cid, system, prompt))
+        mapping[cid] = r["uid"]
+    db.commit()
+    lc = ctx.settings["llm"]
+    model = lc.get("assess_model") or lc["model"]
+    try:
+        batch_id = llm.batch_submit(items, FitAssessment, effort=lc["assess_effort"], model=model)
+    except BudgetReached as e:
+        say(f"  {e}. Assessments wait for tomorrow.")
+        return 0
+    except LLMError as e:
+        say(f"  Batch failed ({e}); assessing one by one instead.")
+        return assess_top(db, ctx, llm, uids=[r["uid"] for r in rows], say=say)
+    pending = _pending_batches(db) + [{"id": batch_id, "map": mapping, "model": model,
+                                       "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}]
+    db.set_learned("assess_batches", pending)
+    db.commit()
+    say(f"Sent {len(rows)} jobs to Claude as a batch (half price). Results usually take a few minutes.")
+    return len(rows)
+
+
+def harvest_batches(db: DB, ctx: Context, llm: Optional[LLM], say: Callable[[str], None] = print) -> int:
+    """Store the results of finished assessment batches. Returns how many jobs got an assessment."""
+    if not llm:
+        return 0
+    from .prompts import ASSESS_RULES
+    pending, keep, stored = _pending_batches(db), [], 0
+    for b in pending:
+        try:
+            if llm.batch_status(b["id"]) != "ended":
+                keep.append(b)
+                continue
+            results = llm.batch_results(b["id"], FitAssessment, model=b.get("model"))
+        except Exception as e:
+            log.debug("batch %s check failed: %s", b["id"], e)
+            age = datetime.now(timezone.utc) - datetime.fromisoformat(b["at"])
+            if age < timedelta(days=2):          # try again later; give up on very old ones
+                keep.append(b)
+            continue
+        failed = 0
+        for cid, a, err in results:
+            uid = b["map"].get(cid)
+            row = db.get_job(uid) if uid else None
+            if not row or row["assessment_json"]:
+                continue
+            if a is None:
+                failed += 1                      # it stays unassessed and is picked again next time
+                continue
+            db.set_assessment(uid, a.fit_score, json.dumps({**a.model_dump(), "rules": ASSESS_RULES}))
+            if a.verdict == "skip" and row["status"] == "shortlisted":
+                db.conn.execute("UPDATE jobs SET status='skipped' WHERE uid=?", (uid,))
+            stored += 1
+        if failed:
+            say(f"  {failed} assessments in a batch didn't come back; they'll be tried again.")
+    db.set_learned("assess_batches", keep)
+    db.commit()
+    if stored:
+        say(f"Stored {stored} assessments from Claude's batch.")
+    return stored
+
+
+def wait_for_batches(db: DB, ctx: Context, llm: Optional[LLM], minutes: float, say: Callable[[str], None] = print,
+                     poll_seconds: float = 30) -> int:
+    """Wait (up to `minutes`) for pending batches, storing results as they finish."""
+    import time
+    deadline, stored = time.monotonic() + minutes * 60, 0
+    if _pending_batches(db) and minutes > 0:
+        say(f"Waiting for Claude's batch (up to {minutes:g} minutes; set llm.batch_wait_minutes to change)...")
+    while _pending_batches(db) and time.monotonic() < deadline:
+        time.sleep(poll_seconds)
+        stored += harvest_batches(db, ctx, llm, say)
+    if _pending_batches(db):
+        say("  The batch is still running; the next quick check (11:30, 15:30 or 19:30) picks up the results.")
+    return stored
+
+
+def prepared_today(db: DB) -> int:
+    return int(db.get_learned(f"prepared:{datetime.now().date().isoformat()}", 0) or 0)
+
+
+def _count_prepared(db: DB, n: int = 1) -> None:
+    db.set_learned(f"prepared:{datetime.now().date().isoformat()}", prepared_today(db) + n)
+
+
+def apply_best(db: DB, ctx: Context, llm: Optional[LLM], mode: str, max_apply: int, st: "RunStats",
+               say: Callable[[str], None] = print) -> list:
+    """Build packs (and apply, in auto/review mode) for the best assessed jobs, within today's allowance."""
+    thr = ctx.settings["scoring"]["apply_threshold"]
+    room = max(0, max_apply - prepared_today(db))
+    where = "status='shortlisted' AND fit_score >= ?" if llm else "status='shortlisted' AND score >= ?"
+    best = db.jobs(where, (thr,), order="COALESCE(fit_score, score) DESC", limit=room) if room else []
+    if mode == "none" or not best:
+        return best
+    from .apply import prepare_and_apply
+    for r in best:
+        if llm and llm.over_budget():
+            say(f"Today's Claude budget (${llm.budget_usd:.2f}) is used up: the other matches wait for tomorrow.")
+            break
+        say(f"Preparing {r['title']} at {r['company']}...")
+        try:
+            out = prepare_and_apply(db, ctx, llm, r["uid"], mode=mode)
+            st.packed += 1
+            st.applied += int(out.submitted)
+            _count_prepared(db)
+            db.commit()
+            for m in out.messages[-3:]:
+                say(f"  {m}")
+        except Exception as e:
+            st.errors.append(f"apply failed for {r['company']}: {e}")
+    return best
+
+
 def watch(db: DB, ctx: Context, llm: Optional[LLM], say: Callable[[str], None] = print) -> list:
     """Quick check for new jobs; pushes "apply today" alerts for the excellent ones."""
     from . import alerts
 
     register = load_register(ctx)
+    # assessments from the morning's batch that finished after the daily run stopped waiting
+    if harvest_batches(db, ctx, llm, say):
+        mode = db.get_learned("daily_mode") or ctx.settings["apply"]["mode"]
+        apply_best(db, ctx, llm, mode, ctx.settings["apply"]["max_applications_per_day"], RunStats(), say)
     st = collect(db, ctx, register, say)
     score_all(db, ctx, register)
     if llm and st.new:
@@ -300,40 +452,31 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
     # 2) learn from results so far, then search and score
     if ctx.settings["scoring"].get("adaptive", True):
         learn.learn_weights(db)
+    harvest_batches(db, ctx, llm, say)          # results of earlier batches that finished late
     st = collect(db, ctx, register, say)
     st.shortlisted = score_all(db, ctx, register)
     say(f"{st.shortlisted} jobs on the shortlist.")
-    st.assessed = assess_top(db, ctx, llm, say=say)
+    lc = ctx.settings["llm"]
+    if lc.get("batch_assessments", True):
+        st.assessed = assess_top(db, ctx, llm, say=say, batch=True)
+        if st.assessed:
+            wait_for_batches(db, ctx, llm, float(lc.get("batch_wait_minutes", 20)), say)
+    else:
+        st.assessed = assess_top(db, ctx, llm, say=say)
 
     # prepare packs (and apply, if asked) for the best ones
     mode = apply_mode or ctx.settings["apply"]["mode"]
+    db.set_learned("daily_mode", mode)        # the quick checks use it for results that arrive later
     max_apply = max_apply if max_apply is not None else ctx.settings["apply"]["max_applications_per_day"]
     thr = ctx.settings["scoring"]["apply_threshold"]
-    where = "status='shortlisted' AND fit_score >= ?" if llm else "status='shortlisted' AND score >= ?"
-    best = db.jobs(where, (thr,), order="COALESCE(fit_score, score) DESC", limit=max_apply)
-    if not best and mode != "none":
+    best = apply_best(db, ctx, llm, mode, max_apply, st, say)
+    if not best and mode != "none" and not _pending_batches(db):
         top = db.conn.execute("SELECT title, company, fit_score FROM jobs WHERE status='shortlisted' AND fit_score IS NOT NULL "
                               "ORDER BY fit_score DESC LIMIT 1").fetchone() if llm else None
         if top:
             say(f"No job reached a Claude fit of {thr}, so no packs were built. Best so far: {top['fit_score']:.0f} for "
                 f"{top['title']} at {top['company']}. See every verdict and the reasons with `jobstream list --assessed`; build one anyway with "
                 f"`jobstream apply <id> --mode pack`, or lower scoring.apply_threshold in config/settings.yaml.")
-    if best and mode != "none":
-        from .apply import prepare_and_apply
-
-        for r in best:
-            if llm and llm.over_budget():
-                say(f"Today's Claude budget (${llm.budget_usd:.2f}) is used up: the other matches wait for tomorrow.")
-                break
-            say(f"Preparing {r['title']} at {r['company']}...")
-            try:
-                out = prepare_and_apply(db, ctx, llm, r["uid"], mode=mode)
-                st.packed += 1
-                st.applied += int(out.submitted)
-                for m in out.messages[-3:]:
-                    say(f"  {m}")
-            except Exception as e:
-                st.errors.append(f"apply failed for {r['company']}: {e}")
 
     # fresh, excellent jobs: push "apply today" (Claude checks them first when it's configured)
     from . import alerts

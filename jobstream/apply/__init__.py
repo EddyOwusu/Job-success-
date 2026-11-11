@@ -132,15 +132,13 @@ def prepare_and_apply(db: DB, ctx: Context, llm: Optional[LLM], uid: str, mode: 
         except Exception as e:
             msgs.append(f"Could not prepare Greenhouse answers: {e}")
 
-    try:
-        plan = networking.build_plan(llm, ctx, job, sponsor)
-        net_md = networking.plan_markdown(plan)
-        for c in plan.contacts:
-            db.add_contact(company=job.company, job_uid=job.uid, name=c.name, role=c.role, email=c.email,
-                           email_confidence=c.email_confidence, linkedin=c.linkedin, source=c.source, notes="")
-    except Exception as e:
-        plan, net_md = None, ""
-        msgs.append(f"Networking plan failed: {e}")
+    plan, net_md = None, ""
+    if ctx.settings["apply"].get("networking", "on_demand") == "always":
+        try:
+            plan = _networking_plan(db, ctx, llm, job, sponsor)
+            net_md = networking.plan_markdown(plan)
+        except Exception as e:
+            msgs.append(f"Networking plan failed: {e}")
 
     statement = None
     if needs_statement(job):
@@ -231,9 +229,42 @@ def prepare_and_apply(db: DB, ctx: Context, llm: Optional[LLM], uid: str, mode: 
     return ApplyOutcome(pack, submitted, method, msgs)
 
 
+def _networking_plan(db: DB, ctx: Context, llm, job, sponsor):
+    plan = networking.build_plan(llm, ctx, job, sponsor)
+    for c in plan.contacts:
+        db.add_contact(company=job.company, job_uid=job.uid, name=c.name, role=c.role, email=c.email,
+                       email_confidence=c.email_confidence, linkedin=c.linkedin, source=c.source, notes="")
+    return plan
+
+
+def build_networking(db: DB, ctx: Context, llm, uid: str):
+    """Networking plan for one job, on request: who to contact and what to say. Saved as networking.md in
+    the job's pack (when it has one). Returns (markdown, path or None)."""
+    from pathlib import Path
+    row = db.get_job(uid)
+    if not row:
+        raise ValueError(f"No job matching '{uid}'")
+    job = db.row_to_job(row)
+    plan = _networking_plan(db, ctx, llm, job, row["sponsor_match"])
+    md = networking.plan_markdown(plan)
+    extra = json.loads(row["extra"] or "{}")
+    path = None
+    d = extra.get("pack_dir") or next((a["pack_dir"] for a in db.conn.execute(
+        "SELECT pack_dir FROM applications WHERE job_uid=? AND pack_dir != '' ORDER BY applied_at DESC", (row["uid"],))), None)
+    if d and Path(d).exists():
+        path = Path(d) / "networking.md"
+        path.write_text(md, encoding="utf-8")
+    extra["networking_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    db.conn.execute("UPDATE jobs SET extra=? WHERE uid=?", (json.dumps(extra), row["uid"]))
+    db.commit()
+    return md, path
+
+
 def schedule_followups(db: DB, ctx: Context, uid: str, outreach) -> None:
     now = datetime.now(timezone.utc)
-    db.add_followup(uid, now, "networking", "Send the day-0 LinkedIn messages in networking.md")
+    db.add_followup(uid, now, "networking", "Send the day-0 LinkedIn messages in networking.md" if outreach else
+                    "Worth a message to someone at the company? Build a networking plan: jobstream network "
+                    + uid.split(":")[-1] + " (or Network on the dashboard)")
     for d in ctx.settings["followup"]["days"]:
         db.add_followup(uid, now + timedelta(days=d), "follow_up",
                         f"Day {d}: send the follow-up message from networking.md (or check the application portal)")

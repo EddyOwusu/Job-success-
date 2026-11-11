@@ -44,6 +44,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         # Effort per task. Higher = better writing, more tokens.
         "assess_effort": "medium",
         "tailor_effort": "high",
+        # The daily run sends its assessments as one Message Batch: half price, results usually within
+        # minutes. It waits up to batch_wait_minutes; later results are picked up by the quick checks.
+        "batch_assessments": True,
+        "batch_wait_minutes": 20,
         # How many of the best keyword-scored jobs per run get a deep Claude assessment
         "max_assessments_per_run": 25,
     },
@@ -104,6 +108,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         # pack:   only build the application pack (CV, letter, answers) for you to submit
         "mode": "review",
         "max_applications_per_day": 3,
+        # Networking plan (contacts and messages) for each pack: "on_demand" builds it only when you ask
+        # (`jobstream network <id>` or the dashboard's Network button); "always" builds one for every pack.
+        "networking": "on_demand",
         "max_per_company_per_30_days": 2,
         "headless": True,             # auto mode runs without a visible window (review always shows one)
         "chromium_path": "",          # leave blank to use Playwright's own browser

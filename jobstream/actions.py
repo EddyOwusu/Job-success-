@@ -25,7 +25,7 @@ from typing import Optional
 from .config import DB_PATH, OUTPUT_DIR, load_context
 from .db import DB
 
-SLOW = {"apply", "pack", "interview"}
+SLOW = {"apply", "pack", "interview", "network"}
 QUICK = {"skip", "applied", "status", "open_pack", "dismiss"}
 STATUSES = {"interview", "offer", "rejected", "withdrawn", "applied"}
 
@@ -182,6 +182,10 @@ class Runner:
                 row = db.get_job(t.uid)
                 att = json.loads(row["extra"] or "{}").get("apply_attempt") or {}
                 return "Not sent: " + (att.get("why") or "see the messages") + ". It's on your Needs you list."
+            if t.action == "network":
+                from .apply import build_networking
+                _md, path = build_networking(db, ctx, llm, t.uid)
+                return "Networking plan ready" + (f": {path.parent.name}/networking.md" if path else "")
             if t.action == "interview":
                 from .interview import build_prep
                 row = db.get_job(t.uid)
