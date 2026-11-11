@@ -67,11 +67,13 @@ def _money(text: str, pattern: str) -> Optional[int]:
 
 def live_thresholds(cache_dir: Path) -> dict[str, Optional[int]]:
     """Salary figures as gov.uk states them today (None if the page wording changed)."""
-    out: dict[str, Optional[int]] = {"general": None, "new_entrant": None, "scaleup": None}
+    out: dict[str, Optional[int]] = {"general": None, "new_entrant": None, "scaleup": None, "transitional": None}
     try:
         sw = _guide("skilled-worker-visa", cache_dir)
         out["general"] = _money(sw.get("your-job", ""), r"highest of:\s*£([\d,]+) per year")
         out["new_entrant"] = _money(sw.get("when-you-can-be-paid-less", ""), r"salary is at least £([\d,]+) per year")
+        out["transitional"] = _money(sw.get("certificate-of-sponsorship-before-4-april-2024", ""),
+                                     r"higher of £([\d,]+) or the lower going rate")
         su = _guide("scale-up-worker-visa", cache_dir)
         out["scaleup"] = _money(su.get("your-job", ""), r"following 2 options:\s*£([\d,]+) per year")
     except Exception:
@@ -153,8 +155,8 @@ def check(profile: Profile, settings: dict, cache_dir: Path, scaleup_count: int 
     # ---- Skilled Worker (+ new entrant)
     drift = []
     for key, setting in (("general", "general_threshold_gbp"), ("new_entrant", "new_entrant_threshold_gbp"),
-                         ("scaleup", "scaleup_threshold_gbp")):
-        if live[key] and live[key] != sp.get(setting):
+                         ("scaleup", "scaleup_threshold_gbp"), ("transitional", "transitional_threshold_gbp")):
+        if live.get(key) and live[key] != sp.get(setting):
             drift.append(f"gov.uk now says £{live[key]:,} for {setting}; your settings say £{sp.get(setting):,}. "
                          f"Update config/settings.yaml.")
     reasons = []
@@ -175,6 +177,32 @@ def check(profile: Profile, settings: dict, cache_dir: Path, scaleup_count: int 
     elif age is None and not v.new_entrant:
         sw.details.append("Add visa.date_of_birth to your profile to check the under-26 new-entrant rate "
                           f"(£{sp['new_entrant_threshold_gbp']:,} minimum).")
+    from .visa import transitional
+    tr = transitional(v)
+    on_route = "skilled worker" in status_text
+    if tr["lower_salary"]:
+        sw.summary = (f"You are already on this route, so moving to a new employer means a new certificate of sponsorship and an "
+                      f"application to update your visa. Your salary floor is £{sp.get('transitional_threshold_gbp', 31300):,} "
+                      f"(or the job's lower going rate, if higher), not £{sp['general_threshold_gbp']:,}.")
+        sw.details.insert(0, "gov.uk: the lower salary rules apply because your first certificate of sponsorship was before "
+                             "4 April 2024 and you have held Skilled Worker visas continuously since. They cover applications "
+                             "made before 4 April 2030.")
+        sw.link = f"{GOV}/skilled-worker-visa/certificate-of-sponsorship-before-4-april-2024"
+    if tr["medium_skilled"]:
+        sw.details.insert(1 if tr["lower_salary"] else 0,
+                          "gov.uk: because your first certificate was before 22 July 2025 (with continuous visas), you can update "
+                          "your visa into a 'medium skilled' occupation. New applicants cannot. IT support roles are usually "
+                          "coded 3131 (IT operations technicians) or 3132 (IT user support technicians): check the code your "
+                          "employer would use in the table of eligible occupations.")
+        sw.next_steps.append("Tell recruiters early: 'I'm already on a Skilled Worker visa, so you'd assign a new certificate of "
+                             "sponsorship and I'd update my visa. I can keep working in my current job until it's approved.'")
+        sw.next_steps.append("Do not start the new job until the updated visa is granted, and do not travel outside the UK "
+                             "while the application is pending.")
+    elif on_route and not v.first_cos_date:
+        sw.details.insert(0, "You say you hold a Skilled Worker visa. Add visa.first_cos_date and continuous_since_first_cos to "
+                             "your profile: if your first certificate was before 4 April 2024, your salary floor drops to "
+                             f"£{sp.get('transitional_threshold_gbp', 31300):,}; before 22 July 2025, medium-skilled jobs such as "
+                             "IT support are open to you.")
     sw.details += drift
     routes.append(sw)
 
@@ -301,6 +329,8 @@ def insights_for(routes: list[Route]) -> list[tuple[int, str, str]]:
                         r.summary + " Run `jobstream visa` for the steps."))
         if r.name == "Skilled Worker":
             for d in r.details:
+                if d.startswith("You say you hold a Skilled Worker visa"):
+                    out.append((1, "Your salary floor may be £31,300, not £41,700", d))
                 if d.startswith("New-entrant rate") and r.next_steps:
                     out.append((1, "You may qualify for the lower new-entrant salary", d + " " + r.next_steps[0]))
                 if d.startswith("gov.uk now says"):

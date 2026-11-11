@@ -52,6 +52,7 @@ def guard(tailored: TailoredCV, profile: Profile, cv: MasterCV) -> tuple[Tailore
             warnings.append(f"Removed role not in your master CV: {r.title} at {r.company}")
             continue
         r.title, r.start, r.end, r.location = src.title, src.start, src.end, src.location or r.location
+        r.kind = src.kind
         bullets = []
         for b in r.bullets:
             invented = _numbers(b) - source_numbers
@@ -59,13 +60,13 @@ def guard(tailored: TailoredCV, profile: Profile, cv: MasterCV) -> tuple[Tailore
                 warnings.append(f"Dropped a bullet with numbers not in your CV ({', '.join(sorted(invented))}): {b[:80]}")
             else:
                 bullets.append(b)
-        r.bullets = bullets or [x.text for x in src.bullets[:3]]
+        r.bullets = bullets or ([] if src.kind == "other" else [x.text for x in src.bullets[:3]])
         roles.append(r)
     # never silently lose a job from the history (gaps raise questions)
     present = {r.company.lower() for r in roles}
     for src in cv.experience:
         if src.company.lower() not in present:
-            roles.append(TailoredRole(company=src.company, title=src.title, location=src.location,
+            roles.append(TailoredRole(company=src.company, title=src.title, location=src.location, kind=src.kind,
                                       start=src.start, end=src.end, bullets=[b.text for b in src.bullets[:2]]))
     order = {r.company.lower(): i for i, r in enumerate(cv.experience)}
     tailored.experience = sorted(roles, key=lambda r: order.get(r.company.lower(), 99))
@@ -104,8 +105,9 @@ def keyword_tailor(ctx: Context, job: Job) -> TailoredCV:
     roles = []
     for i, r in enumerate(ctx.cv.experience):
         ranked = sorted(r.bullets, key=lambda b: -rel(b.tags, b.text))
-        roles.append(TailoredRole(company=r.company, title=r.title, location=r.location, start=r.start,
-                                  end=r.end, bullets=[b.text for b in ranked[: 6 if i < 2 else 3]]))
+        keep = 0 if r.kind == "other" else (6 if i < 2 else 3)
+        roles.append(TailoredRole(company=r.company, title=r.title, location=r.location, start=r.start, kind=r.kind,
+                                  end=r.end, bullets=[b.text for b in ranked[:keep]]))
     projects = sorted(ctx.cv.projects, key=lambda p: -rel(p.tags, p.description))
     return TailoredCV(
         headline=ctx.cv.headline or job.title,

@@ -71,12 +71,15 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         # https://www.gov.uk/skilled-worker-visa/your-job
         "general_threshold_gbp": 41700,
         "new_entrant_threshold_gbp": 33400,
+        # If you were first sponsored before 4 April 2024 and have held Skilled Worker visas ever since
+        "transitional_threshold_gbp": 31300,
         "scaleup_threshold_gbp": 39100,     # Scale-up Worker visa minimum (or the going rate, if higher)
         # Employers that sponsor under a different legal name than their brand
         "aliases": {
             "Meta": "Facebook UK", "Coinbase": "CB Payments Ltd", "Elastic": "Elasticsearch Limited",
             "Lloyds Banking Group": "Lloyds Bank plc", "NewDay": "NewDay Cards Limited", "Oxa": "Oxa Autonomy Limited",
             "Paddle": "Paddle.com Market Limited", "Deliveroo": "Roofoods Ltd",
+            "Lottie": "Lottie Organisation Ltd", "Birdie": "Birdie Care Services Limited",
         },
         # Going rates for common tech occupation codes. Fill in from the official
         # going-rates table (Appendix Skilled Occupations); 0 = not checked.

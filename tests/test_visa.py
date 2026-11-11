@@ -37,7 +37,25 @@ def test_parse_salary(text, expected):
 
 
 def test_salary_check(settings):
-    assert salary_check(30000, 35000, settings, new_entrant=False).status == "below"
-    assert salary_check(30000, 35000, settings, new_entrant=True).status == "ok"
-    assert salary_check(None, None, settings, new_entrant=False).status == "unknown"
-    assert salary_check(45000, 60000, settings, new_entrant=False).status == "ok"
+    assert salary_check(30000, 35000, settings, False).status == "below"
+    assert salary_check(30000, 35000, settings, True).status == "ok"
+    assert salary_check(None, None, settings, False).status == "unknown"
+    assert salary_check(45000, 60000, settings, False).status == "ok"
+
+
+def test_transitional_rules_for_people_already_sponsored(settings):
+    from types import SimpleNamespace as V
+
+    from jobstream.visa import threshold_for, transitional
+
+    early = V(first_cos_date="2022-11", continuous_since_first_cos=True, new_entrant=False)
+    assert transitional(early) == {"lower_salary": True, "medium_skilled": True}
+    assert threshold_for(early, settings)[0] == 31300
+    assert salary_check(32000, 34000, settings, early).status == "ok"          # blocked for a new applicant
+    assert salary_check(28000, 30000, settings, early).status == "below"
+    mid = V(first_cos_date="2024-09-15", continuous_since_first_cos=True, new_entrant=False)
+    assert transitional(mid) == {"lower_salary": False, "medium_skilled": True}
+    assert threshold_for(mid, settings)[0] == 41700
+    broken = V(first_cos_date="2022-11-01", continuous_since_first_cos=False, new_entrant=False)
+    assert transitional(broken) == {"lower_salary": False, "medium_skilled": False}
+    assert threshold_for(V(first_cos_date=None, continuous_since_first_cos=False, new_entrant=True), settings)[0] == 33400

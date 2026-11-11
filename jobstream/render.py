@@ -24,6 +24,18 @@ def fmt_date(s: str) -> str:
     return s
 
 
+def split_roles(cv: TailoredCV):
+    """(main roles, other-employment roles)."""
+    main = [r for r in cv.experience if getattr(r, "kind", "main") != "other"]
+    other = [r for r in cv.experience if getattr(r, "kind", "main") == "other"]
+    return main, other
+
+
+def other_line(r) -> str:
+    place = f", {r.location}" if r.location else ""
+    return f"{r.title}, {r.company}{place} | {fmt_date(r.start)} - {fmt_date(r.end)}"
+
+
 def contact_line(p: Personal) -> str:
     bits = [p.location, p.phone, p.email, p.linkedin, p.github, p.portfolio]
     return " | ".join(b.replace("https://", "").replace("www.", "") for b in bits if b)
@@ -33,9 +45,14 @@ def contact_line(p: Personal) -> str:
 def cv_markdown(cv: TailoredCV, p: Personal) -> str:
     out = [f"# {p.full_name}", cv.headline, "", contact_line(p), "", "## Summary", cv.summary, "",
            "## Skills", ", ".join(cv.skills), "", "## Experience"]
-    for r in cv.experience:
+    main, other = split_roles(cv)
+    for r in main:
         out += ["", f"### {r.title}, {r.company}", f"{r.location} | {fmt_date(r.start)} - {fmt_date(r.end)}"]
         out += [f"- {b}" for b in r.bullets]
+    if other:
+        out += ["", "## Other employment"]
+        for r in other:
+            out.append(f"- {other_line(r)}" + (f": {r.bullets[0]}" if r.bullets else ""))
     if cv.projects:
         out += ["", "## Projects"] + [f"- {x}" for x in cv.projects]
     if cv.education:
@@ -86,7 +103,8 @@ def cv_docx(cv: TailoredCV, p: Personal, path: Path) -> Path:
     heading("Skills")
     doc.add_paragraph(", ".join(cv.skills))
     heading("Experience")
-    for role in cv.experience:
+    main, other = split_roles(cv)
+    for role in main:
         para = doc.add_paragraph()
         para.paragraph_format.space_before = Pt(5)
         t = para.add_run(f"{role.title}, {role.company}")
@@ -94,6 +112,10 @@ def cv_docx(cv: TailoredCV, p: Personal, path: Path) -> Path:
         doc.add_paragraph(f"{role.location} | {fmt_date(role.start)} - {fmt_date(role.end)}").runs[0].italic = True
         for b in role.bullets:
             doc.add_paragraph(b, style="List Bullet")
+    if other:
+        heading("Other employment")
+        for role in other:
+            doc.add_paragraph(other_line(role) + (f": {role.bullets[0]}" if role.bullets else ""), style="List Bullet")
     for title, items in (("Projects", cv.projects), ("Education", cv.education), ("Certifications", cv.certifications)):
         if items:
             heading(title)
@@ -167,10 +189,14 @@ def cv_pdf(cv: TailoredCV, p: Personal, path: Path) -> Path:
              Paragraph("SUMMARY", st["h"]), Paragraph(_esc(cv.summary), st["base"]),
              Paragraph("SKILLS", st["h"]), Paragraph(_esc(", ".join(cv.skills)), st["base"]),
              Paragraph("EXPERIENCE", st["h"])]
-        for r in cv.experience:
+        main, other = split_roles(cv)
+        for r in main:
             s.append(Paragraph(_esc(f"{r.title}, {r.company}"), st["role"]))
             s.append(Paragraph(_esc(f"{r.location} | {fmt_date(r.start)} - {fmt_date(r.end)}"), st["meta"]))
             s += [Paragraph(_esc(b), st["bullet"], bulletText="•") for b in r.bullets]
+        if other:
+            s.append(Paragraph("OTHER EMPLOYMENT", st["h"]))
+            s += [Paragraph(_esc(other_line(r) + (f": {r.bullets[0]}" if r.bullets else "")), st["bullet"], bulletText="•") for r in other]
         for title, items in (("PROJECTS", cv.projects), ("EDUCATION", cv.education), ("CERTIFICATIONS", cv.certifications)):
             if items:
                 s.append(Paragraph(title, st["h"]))

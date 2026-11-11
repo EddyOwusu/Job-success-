@@ -286,3 +286,8 @@ companies:
 - {name: "Techary", ats: greenhouse, token: "techary", scaleup: true}
 - {name: "Veramed", ats: greenhouse, token: "veramed", scaleup: true}
 - {name: "Wheely Technologies", ats: greenhouse, token: "wheely", scaleup: true}
+# --- Health and care technology (sponsor-licensed, checked 2026-11-11) ---
+- {name: "Birdie", ats: ashby, token: "birdie"}
+- {name: "Sona", ats: ashby, token: "sona"}
+- {name: "Limbic", ats: ashby, token: "limbic"}
+- {name: "Lottie", ats: ashby, token: "lottie"}

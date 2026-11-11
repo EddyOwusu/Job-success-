@@ -53,6 +53,7 @@ def _short(uid: str) -> str:
 
 def collect(db: DB, ctx: Context) -> dict:
     from . import growth, health, insights, learn, radar, speculative
+    from .visa import threshold_for
 
     today = date.today().isoformat()
     counts = dict(db.conn.execute("SELECT status, COUNT(*) FROM jobs GROUP BY status").fetchall())
@@ -124,7 +125,7 @@ def collect(db: DB, ctx: Context) -> dict:
         "name": ctx.profile.personal.first_name, "example": bool(ctx.using_examples),
         "holder": {"first": ctx.profile.personal.first_name, "last": ctx.profile.personal.last_name},
         "visa_route": ctx.profile.visa.target_route if ctx.profile.visa.needs_sponsorship else "No sponsor needed",
-        "threshold": sp["new_entrant_threshold_gbp"] if ctx.profile.visa.new_entrant else sp["general_threshold_gbp"],
+        "threshold": threshold_for(ctx.profile.visa, ctx.settings)[0],
         "sponsor_count": db.conn.execute("SELECT COUNT(*) FROM sponsor_seen WHERE removed_at IS NULL").fetchone()[0],
         "found": sum(counts.values()),
         "last_run": last_run["at"][:16].replace("T", " ") if last_run else None,

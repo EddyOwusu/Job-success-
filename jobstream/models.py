@@ -64,6 +64,9 @@ class Visa(BaseModel):
     current_status: str = ""
     nationality: str = ""
     new_entrant: bool = False
+    # Already on the Skilled Worker route? These unlock gov.uk's transitional rules.
+    first_cos_date: Optional[str] = None            # YYYY-MM-DD (or YYYY-MM) of your FIRST certificate of sponsorship
+    continuous_since_first_cos: bool = False        # held Skilled Worker visas without a break since then
     earliest_start: str = ""
     willing_to_relocate: bool = True
     skip_security_clearance_roles: bool = True
@@ -99,6 +102,7 @@ class Bullet(BaseModel):
 class Role(BaseModel):
     company: str
     title: str
+    kind: str = "main"       # "other" = listed briefly under "Other employment"
     location: str = ""
     start: str = ""
     end: str = "present"
@@ -200,6 +204,7 @@ class TailoredRole(BaseModel):
     start: str
     end: str
     bullets: list[str]
+    kind: str = "main"
 
 
 class TailoredCV(BaseModel):

@@ -171,7 +171,8 @@ def build_prep(llm: Optional[LLM], ctx: Context, db: DB, job: Job, sponsor: Opti
     except LLMError as e:
         msgs.append(f"Web research skipped: {e}")
     sp = ctx.settings["sponsorship"]
-    threshold = sp["new_entrant_threshold_gbp"] if ctx.profile.visa.new_entrant else sp["general_threshold_gbp"]
+    from .visa import threshold_for
+    threshold, _ = threshold_for(ctx.profile.visa, ctx.settings)
     task = PREP_TASK.format(
         stage=stage, interviewers=interviewers or "not known", notes=notes or "none",
         research=notes_md or "No research available: rely on the advert and say what to look up.",
@@ -236,7 +237,8 @@ def template_prep(ctx: Context, job: Job, stage: str) -> str:
     skills = sorted(extract_weighted(job.description).items(), key=lambda kv: -kv[1])
     have = {s.name.lower() for s in ctx.profile.skills}
     sp = ctx.settings["sponsorship"]
-    threshold = sp["new_entrant_threshold_gbp"] if ctx.profile.visa.new_entrant else sp["general_threshold_gbp"]
+    from .visa import threshold_for
+    threshold, _ = threshold_for(ctx.profile.visa, ctx.settings)
     o = [f"# Interview prep: {job.title} at {job.company}", "", f"Stage: {stage}. Link: {job.url}", "",
          "Template (add your Claude API key for researched, tailored prep).", "",
          "## Research before the interview", "",

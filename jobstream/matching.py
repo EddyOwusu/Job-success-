@@ -170,7 +170,7 @@ def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Spon
     freshness = score_freshness(job)
 
     # ---- salary vs visa rules and your minimum
-    sc = salary_check(job.salary_min, job.salary_max, settings, profile.visa.new_entrant)
+    sc = salary_check(job.salary_min, job.salary_max, settings, profile.visa)
     if sc.status == "ok":
         salary = 1.0
         top = job.salary_max or job.salary_min or 0

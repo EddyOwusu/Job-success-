@@ -119,9 +119,42 @@ class SalaryCheck:
     detail: str
 
 
-def salary_check(salary_min: Optional[float], salary_max: Optional[float], settings: dict, new_entrant: bool) -> SalaryCheck:
+def _before(date_str: Optional[str], cutoff: str) -> bool:
+    """True when a YYYY-MM-DD or YYYY-MM date is before the cutoff (YYYY-MM-DD)."""
+    if not date_str:
+        return False
+    d = str(date_str).strip()
+    if re.fullmatch(r"\d{4}-\d{2}", d):
+        d += "-01"
+    return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", d)) and d < cutoff
+
+
+def transitional(visa) -> dict:
+    """gov.uk's rules for people already on the Skilled Worker route (both need continuous visas since):
+    lower_salary     - first certificate of sponsorship before 4 April 2024
+    medium_skilled   - first certificate of sponsorship before 22 July 2025"""
+    cont = bool(getattr(visa, "continuous_since_first_cos", False))
+    first = getattr(visa, "first_cos_date", None)
+    return {"lower_salary": cont and _before(first, "2024-04-04"), "medium_skilled": cont and _before(first, "2025-07-22")}
+
+
+def threshold_for(visa, settings: dict) -> tuple[int, str]:
+    """(salary floor, why) for this person. The job's going rate can still be higher."""
     sp = settings["sponsorship"]
-    threshold = sp["new_entrant_threshold_gbp"] if new_entrant else sp["general_threshold_gbp"]
+    if transitional(visa)["lower_salary"]:
+        return sp.get("transitional_threshold_gbp", 31300), "lower rate for people first sponsored before 4 April 2024"
+    if getattr(visa, "new_entrant", False):
+        return sp["new_entrant_threshold_gbp"], "new-entrant rate"
+    return sp["general_threshold_gbp"], "standard rate"
+
+
+def salary_check(salary_min: Optional[float], salary_max: Optional[float], settings: dict, visa=None) -> SalaryCheck:
+    """`visa` is the profile's visa section (or True/False for new entrant, kept for old callers)."""
+    if isinstance(visa, bool) or visa is None:
+        sp = settings["sponsorship"]
+        threshold = sp["new_entrant_threshold_gbp"] if visa else sp["general_threshold_gbp"]
+    else:
+        threshold, _why = threshold_for(visa, settings)
     if not salary_min and not salary_max:
         return SalaryCheck("unknown", f"Salary not stated. Ask the recruiter if it is at least £{threshold:,.0f}.")
     top = salary_max or salary_min

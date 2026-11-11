@@ -18,6 +18,11 @@ class Insight:
     detail: str
 
 
+def _floor(ctx: Context) -> int:
+    from .visa import threshold_for
+    return threshold_for(ctx.profile.visa, ctx.settings)[0]
+
+
 def compute(db: DB, ctx: Context) -> list[Insight]:
     out: list[Insight] = []
     thr = ctx.settings["scoring"]["shortlist_threshold"]
@@ -121,7 +126,7 @@ def compute(db: DB, ctx: Context) -> list[Insight]:
     if viable and unknown / len(viable) > 0.5:
         out.append(Insight(3, "Most adverts hide the salary",
                            "Ask the recruiter early: 'Is the role able to meet the Skilled Worker salary "
-                           f"threshold of £{ctx.settings['sponsorship']['general_threshold_gbp']:,}?' It saves weeks."))
+                           f"threshold of £{_floor(ctx):,}?' It saves weeks."))
 
     # ---- funnel health
     apps = db.conn.execute("SELECT status, applied_at FROM applications").fetchall()

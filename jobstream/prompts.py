@@ -80,7 +80,9 @@ TAILOR_TASK = """Write a tailored, ATS-friendly CV for this job.
   spelling (e.g. "PostgreSQL" vs "Postgres") when it is the same thing.
 - experience: every role from the master CV, in the same order, with the same company, title and
   dates. Choose and rewrite 3-6 bullets per recent role (fewer for older roles): strongest
-  evidence for this job first, start each with a verb, keep the numbers.
+  evidence for this job first, start each with a verb, keep the numbers. Roles marked
+  kind: other are listed in a brief "Other employment" section: give them no bullets, or one
+  short bullet only when the role is directly relevant to this job.
 - projects: 0-3 one-line entries, only if they help for this job.
 - education / certifications: as in the dossier, one line each.
 Keep it to what fits on two A4 pages.
