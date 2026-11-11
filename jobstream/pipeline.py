@@ -131,11 +131,13 @@ def collect(db: DB, ctx: Context, register: SponsorRegister, say: Callable[[str]
         if not want(job.title):
             continue
         st.kept += 1
-        sp = register.match(job.company) or register.match_scaleup(job.company)
+        from .agencies import is_agency
+        sp = None if is_agency(job.company, job.extra) else (register.match(job.company) or register.match_scaleup(job.company))
         if db.upsert_job(job, sp.name if sp else None):
             st.new += 1
     db.commit()
-    say(f"Fetched {st.fetched} jobs, {st.kept} relevant, {st.new} new.")
+    merged = db.merge_duplicates()
+    say(f"Fetched {st.fetched} jobs, {st.kept} relevant, {st.new} new." + (f" Merged {merged} duplicates." if merged else ""))
     return st
 
 
@@ -147,9 +149,11 @@ def score_all(db: DB, ctx: Context, register: SponsorRegister, only_new: bool = 
     n = 0
     for r in rows:
         job = db.row_to_job(r)
-        sp = register.match(job.company)
-        su = register.match_scaleup(job.company)
-        b = score_job(job, ctx.profile, ctx.settings, sp, weights, scaleup=su)
+        from .agencies import is_agency
+        agency = is_agency(job.company, job.extra)
+        sp = None if agency else register.match(job.company)
+        su = None if agency else register.match_scaleup(job.company)
+        b = score_job(job, ctx.profile, ctx.settings, sp, weights, scaleup=su, agency=agency)
         db.set_score(job.uid, b.total, b.model_dump_json())
         on_register = sp or su
         db.conn.execute("UPDATE jobs SET sponsor_match=? WHERE uid=?",
@@ -164,15 +168,24 @@ def score_all(db: DB, ctx: Context, register: SponsorRegister, only_new: bool = 
 
 
 def assess_top(db: DB, ctx: Context, llm: Optional[LLM], limit: Optional[int] = None,
-               say: Callable[[str], None] = print) -> int:
+               say: Callable[[str], None] = print, fresh_only: bool = False) -> int:
+    """Claude reads the best unassessed shortlisted jobs. fresh_only: just the new, alert-worthy ones."""
     if not llm:
         return 0
     from .assess import assess
 
     limit = limit or ctx.settings["llm"]["max_assessments_per_run"]
-    rows = db.jobs("status='shortlisted' AND assessment_json IS NULL", order="score DESC", limit=limit)
-    if rows:
-        say(f"Claude is assessing the top {len(rows)} shortlisted jobs...")
+    if fresh_only:
+        a = ctx.settings["alerts"]
+        since = (datetime.now(timezone.utc) - timedelta(hours=a["max_age_hours"])).isoformat()
+        rows = db.jobs("status='shortlisted' AND assessment_json IS NULL AND sponsor_match IS NOT NULL "
+                       "AND first_seen >= ? AND score >= ?", (since, a["hot_score"]), order="score DESC", limit=limit)
+        if rows:
+            say(f"Claude is checking {len(rows)} fresh jobs before any 'apply today' alert...")
+    else:
+        rows = db.jobs("status='shortlisted' AND assessment_json IS NULL", order="score DESC", limit=limit)
+        if rows:
+            say(f"Claude is assessing the top {len(rows)} shortlisted jobs...")
     n = 0
 
     def one(r):
@@ -201,8 +214,8 @@ def watch(db: DB, ctx: Context, llm: Optional[LLM], say: Callable[[str], None] =
     st = collect(db, ctx, register, say)
     score_all(db, ctx, register)
     if llm and st.new:
-        assess_top(db, ctx, llm, limit=ctx.settings["alerts"]["max_assess_per_watch"], say=say)
-    hot = alerts.send(db, ctx, say)
+        assess_top(db, ctx, llm, limit=ctx.settings["alerts"]["max_assess_per_watch"], say=say, fresh_only=True)
+    hot = alerts.send(db, ctx, say, require_fit=llm is not None)
     say(f"{st.new} new jobs, {len(hot)} worth applying to today.")
     from . import health
     for i in health.insights(db):
@@ -273,6 +286,13 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
     thr = ctx.settings["scoring"]["apply_threshold"]
     where = "status='shortlisted' AND fit_score >= ?" if llm else "status='shortlisted' AND score >= ?"
     best = db.jobs(where, (thr,), order="COALESCE(fit_score, score) DESC", limit=max_apply)
+    if not best and mode != "none":
+        top = db.conn.execute("SELECT title, company, fit_score FROM jobs WHERE status='shortlisted' AND fit_score IS NOT NULL "
+                              "ORDER BY fit_score DESC LIMIT 1").fetchone() if llm else None
+        if top:
+            say(f"No job reached a Claude fit of {thr}, so no packs were built. Best so far: {top['fit_score']:.0f} for "
+                f"{top['title']} at {top['company']}. See them with `jobstream list`; build one anyway with "
+                f"`jobstream apply <id> --mode pack`, or lower scoring.apply_threshold in config/settings.yaml.")
     if best and mode != "none":
         from .apply import prepare_and_apply
 
@@ -287,9 +307,11 @@ def daily_run(db: DB, ctx: Context, llm: Optional[LLM], apply_mode: Optional[str
             except Exception as e:
                 st.errors.append(f"apply failed for {r['company']}: {e}")
 
-    # fresh, excellent jobs: push "apply today"
+    # fresh, excellent jobs: push "apply today" (Claude checks them first when it's configured)
     from . import alerts
-    for r in alerts.send(db, ctx, say):
+    if llm:
+        assess_top(db, ctx, llm, limit=ctx.settings["alerts"]["max_assess_per_watch"], say=say, fresh_only=True)
+    for r in alerts.send(db, ctx, say, require_fit=llm is not None):
         t, body = alerts.describe(r)
         extra_insights.append(Insight(1, t, body.replace("\n", ". Run: ")))
 

@@ -135,7 +135,7 @@ def score_freshness(job: Job) -> float:
 
 
 def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Sponsor],
-              weights: Optional[dict] = None, scaleup: Optional[Sponsor] = None) -> ScoreBreakdown:
+              weights: Optional[dict] = None, scaleup: Optional[Sponsor] = None, agency: bool = False) -> ScoreBreakdown:
     """`weights` defaults to WEIGHTS; learn.py supplies tuned ones once you have results."""
     blockers: list[str] = []
     notes: list[str] = []
@@ -194,6 +194,8 @@ def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Spon
 
     # ---- sponsorship
     sig = sponsorship_signal(job.description)
+    if agency:
+        sponsor = scaleup = None      # an agency's own licence says nothing about its client
     if profile.visa.needs_sponsorship:
         if sig.label == "negative":
             blockers.append("Advert says no visa sponsorship: " + sig.evidence[0][:120])
@@ -205,6 +207,10 @@ def score_job(job: Job, profile: Profile, settings: dict, sponsor: Optional[Spon
             if sig.label == "weak_negative":
                 sponsorship -= 0.25
                 notes.append("Advert mentions right to work. Ask the recruiter whether they sponsor for this role.")
+        elif agency:
+            sponsorship = 0.6 if sig.label == "positive" else 0.15
+            notes.append("Posted by a recruitment agency, so the real employer is hidden. Ask the recruiter who the client "
+                         "is and whether it holds a sponsor licence before spending time on this one.")
         elif sig.label == "positive":
             sponsorship = 0.6
             notes.append("Advert offers sponsorship but the employer name is not on the register (agency or different legal name?)")

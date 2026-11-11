@@ -108,6 +108,26 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+_PLACE_STOP = {"uk", "united", "kingdom", "england", "scotland", "wales", "gb", "remote", "hybrid", "the", "of", "and",
+               "greater", "office", "based", "flexible", "on", "site", "onsite", "or", "county"}
+
+
+def _place(loc: str) -> list[str]:
+    import re
+
+    return [w for w in re.findall(r"[a-z]+", (loc or "").lower()) if w not in _PLACE_STOP]
+
+
+def same_place(a: str, b: str) -> bool:
+    """Loose match: 'Milton Keynes' and 'Milton Keynes, Buckinghamshire' are the same place; an empty
+    location matches anything; 'London' and 'Manchester' are different."""
+    pa, pb = _place(a), _place(b)
+    if not pa or not pb:
+        return True
+    sa, sb = set(pa), set(pb)
+    return sa <= sb or sb <= sa or pa[0] == pb[0]
+
+
 def fingerprint(company: str, title: str) -> str:
     import re
 
@@ -147,6 +167,8 @@ class DB:
     # ------------------------------------------------------------------ jobs
     def upsert_job(self, job: Job, sponsor_match: Optional[str]) -> bool:
         """Insert or refresh a job. Returns True when the job is new (also across sources)."""
+        job.company = " ".join((job.company or "").split())
+        job.title = " ".join((job.title or "").split())
         fp = fingerprint(job.company, job.title)
         ts = now_iso()
         cur = self.conn.execute("SELECT uid FROM jobs WHERE uid=?", (job.uid,))
@@ -156,9 +178,8 @@ class DB:
                 (ts, job.description, sponsor_match, job.uid),
             )
             return False
-        dup = self.conn.execute(
-            "SELECT uid FROM jobs WHERE fingerprint=? AND location=?", (fp, job.location)
-        ).fetchone()
+        dup = next((r for r in self.conn.execute("SELECT uid, location FROM jobs WHERE fingerprint=?", (fp,))
+                    if same_place(r["location"], job.location)), None)
         if dup:  # the same advert reposted on another board
             self.conn.execute("UPDATE jobs SET last_seen=? WHERE uid=?", (ts, dup["uid"]))
             return False
@@ -175,6 +196,27 @@ class DB:
             ),
         )
         return True
+
+    def merge_duplicates(self) -> int:
+        """Remove adverts stored twice (same employer, title and place from different boards), keeping the
+        first one seen. Jobs you have packed or applied to are never removed."""
+        removed = 0
+        groups = self.conn.execute("SELECT fingerprint FROM jobs GROUP BY fingerprint HAVING COUNT(*) > 1").fetchall()
+        for (fp,) in groups:
+            rows = self.conn.execute("SELECT uid, location, status FROM jobs WHERE fingerprint=? ORDER BY first_seen, uid",
+                                     (fp,)).fetchall()
+            kept: list = []
+            for r in rows:
+                twin = next((k for k in kept if same_place(k["location"], r["location"])), None)
+                in_use = r["status"] in ("packed", "applied", "interview", "offer", "rejected", "withdrawn") or \
+                    self.conn.execute("SELECT 1 FROM applications WHERE job_uid=?", (r["uid"],)).fetchone()
+                if twin is not None and not in_use:
+                    self.conn.execute("DELETE FROM jobs WHERE uid=?", (r["uid"],))
+                    removed += 1
+                else:
+                    kept.append(r)
+        self.conn.commit()
+        return removed
 
     def commit(self) -> None:
         self.conn.commit()

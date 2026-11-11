@@ -21,6 +21,13 @@ def search(query: str, location: str = "", max_results: int = 100, details: int 
     if location and "remote" not in location.lower():
         params.update(locationName=location, distanceFromLocation=15)
     data = get_json(f"{API}/search", params=params, auth=auth, min_interval=0.5) or {}
+    # Reed marks adverts placed by recruitment agencies: the real employer is hidden, so sponsorship is unknown
+    try:
+        agency = get_json(f"{API}/search", params={**params, "postedByRecruitmentAgency": "true"}, auth=auth,
+                          min_interval=0.5) or {}
+        agency_ids = {str(r.get("jobId")) for r in agency.get("results", [])}
+    except Exception:
+        agency_ids = None
     jobs = []
     if stats is not None:
         stats["seen"] = stats.get("seen", 0) + len(data.get("results", []))
@@ -50,6 +57,7 @@ def search(query: str, location: str = "", max_results: int = 100, details: int 
             url=r.get("jobUrl", ""), apply_url=apply_url, description=desc,
             salary_min=lo, salary_max=hi,
             remote=work_mode(r.get("locationName", ""), desc[:500]), posted_at=posted,
-            extra={"recruiter": r.get("employerName"), "applications": r.get("applications"), **extra},
+            extra={"recruiter": r.get("employerName"), "applications": r.get("applications"),
+                   "agency": (str(r["jobId"]) in agency_ids) if agency_ids is not None else None, **extra},
         ))
     return jobs

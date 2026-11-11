@@ -26,15 +26,18 @@ def _hours_ago(iso: Optional[str]) -> Optional[float]:
     return (datetime.now(timezone.utc) - t).total_seconds() / 3600
 
 
-def find_hot(db: DB, ctx: Context, limit: int = 5) -> list:
-    """Shortlisted jobs, not yet alerted, found and posted recently, with a high enough score."""
+def find_hot(db: DB, ctx: Context, limit: int = 5, require_fit: bool = False) -> list:
+    """Shortlisted jobs at licensed sponsors, not yet alerted, found and posted recently, scoring high enough.
+    require_fit: only jobs Claude has assessed (used whenever Claude is configured)."""
     a = ctx.settings["alerts"]
     since = (datetime.now(timezone.utc) - timedelta(hours=a["max_age_hours"])).isoformat()
+    by_score = "" if require_fit else " OR (fit_score IS NULL AND score >= ?)"
+    params = (since, a["hot_fit"]) if require_fit else (since, a["hot_fit"], a["hot_score"])
     rows = db.conn.execute(
-        """SELECT * FROM jobs WHERE status IN ('shortlisted','packed') AND alerted_at IS NULL AND first_seen >= ?
-           AND ((fit_score IS NOT NULL AND fit_score >= ?) OR (fit_score IS NULL AND score >= ?))
-           ORDER BY COALESCE(fit_score, score) DESC""",
-        (since, a["hot_fit"], a["hot_score"]),
+        f"""SELECT * FROM jobs WHERE status IN ('shortlisted','packed') AND alerted_at IS NULL AND first_seen >= ?
+           AND sponsor_match IS NOT NULL
+           AND ((fit_score IS NOT NULL AND fit_score >= ?){by_score})
+           ORDER BY COALESCE(fit_score, score) DESC""", params,
     ).fetchall()
     hot = []
     for r in rows:
@@ -60,9 +63,9 @@ def describe(r) -> tuple[str, str]:
     return title, body
 
 
-def send(db: DB, ctx: Context, say=print) -> list:
+def send(db: DB, ctx: Context, say=print, require_fit: bool = False) -> list:
     """Push an alert for each hot job (once per job). Returns the jobs alerted."""
-    hot = find_hot(db, ctx, limit=ctx.settings["alerts"]["max_per_run"])
+    hot = find_hot(db, ctx, limit=ctx.settings["alerts"]["max_per_run"], require_fit=require_fit)
     for r in hot:
         title, body = describe(r)
         say(f"  HOT  {title}  ({body.splitlines()[0]})")

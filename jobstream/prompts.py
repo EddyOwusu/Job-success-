@@ -37,6 +37,14 @@ be honest and specific. Write in {profile.writing.spelling}.
 {dossier(profile, cv)}"""
 
 
+def _agency_note(job: Job) -> str:
+    from .agencies import is_agency
+    if is_agency(job.company, job.extra):
+        return ("\nPosted by a recruitment agency: the hiring company is not named, so whether it can sponsor is "
+                "unknown until the recruiter confirms the client.")
+    return ""
+
+
 def job_block(job: Job, sponsor_name: str | None, extra: str = "") -> str:
     salary = ""
     if job.salary_min or job.salary_max:
@@ -46,7 +54,7 @@ Company: {job.company}
 Title: {job.title}
 Location: {job.location} ({job.remote or 'work mode not stated'})
 Salary: {salary or 'not stated'}
-On the UK Skilled Worker sponsor register as: {sponsor_name or 'NOT FOUND on the register'}
+On the UK Skilled Worker sponsor register as: {sponsor_name or 'NOT FOUND on the register'}{_agency_note(job)}
 URL: {job.url}
 
 {job.description[:20000]}

@@ -174,3 +174,14 @@ def test_speculative_targets_and_pack(tmp_path, monkeypatch, profile, cv, settin
     db.commit()
     assert [r["company"] for r in speculative.due_followups(db)] == ["Rocket Labs"]
     assert speculative.mark(db, "Rocket Labs", "replied") and speculative.due_followups(db) == []
+
+
+def test_alerts_need_a_sponsor_and_claude_when_available(tmp_path, monkeypatch, profile, cv, settings):
+    db = DB(tmp_path / "h.db")
+    ctx = Context(profile, cv, settings)
+    store(db, job("Agency", "Backend Engineer"), score=90, sponsor=None)      # agency / unknown sponsor
+    store(db, job("Unassessed", "Python Developer"), score=88)                 # keyword score only
+    store(db, job("Assessed", "Software Engineer"), score=70, fit=88)
+    monkeypatch.setattr(alerts.notify, "push", lambda *a, **k: [])
+    assert [r["company"] for r in alerts.find_hot(db, ctx)] == ["Unassessed", "Assessed"]
+    assert [r["company"] for r in alerts.find_hot(db, ctx, require_fit=True)] == ["Assessed"]
