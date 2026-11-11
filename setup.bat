@@ -22,12 +22,14 @@ if errorlevel 1 goto :failed
 echo Installing the browser used to fill application forms...
 playwright install chromium
 if errorlevel 1 goto :failed
-jobstream init
+rem Use python -m so nothing in this folder can shadow the jobstream command
+python -m jobstream init
+if errorlevel 1 goto :failed
 echo.
 echo Setup finished. Next:
 echo   1. Put your Claude API key in the .env file:   notepad .env
 echo   2. Fill in config\profile.yaml and config\cv_master.yaml
-echo   3. Double-click JobStream.bat and run:   jobstream doctor
+echo   3. Double-click "Start JobStream.bat" and run:   jobstream doctor
 echo.
 pause
 exit /b 0
