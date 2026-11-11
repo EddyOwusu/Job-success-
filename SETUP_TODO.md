@@ -19,7 +19,7 @@ Nothing here contains personal data, so it is safe in the repository.
   ```
 - [ ] Run `setup.bat` (in that window, or double-click it in the JobStream folder). It creates the
       Python environment, installs everything, downloads the browser and runs `jobstream init`
-- [ ] From now on, double-click **`Start Start JobStream.bat`** whenever you want to use it. It opens a command
+- [ ] From now on, double-click **`Start JobStream.bat`** whenever you want to use it. It opens a command
       window where the `jobstream` command works
 
 **Mac or Linux**
