@@ -96,6 +96,9 @@ TAXONOMY: dict[str, list[str]] = {
     "Jenkins": ["jenkins"],
     "GitLab CI": ["gitlab ci"],
     "Linux": ["linux", "unix"],
+    "SSH": ["ssh", "secure shell"],
+    # tool names only where they're the same skill; RDP and AnyDesk are separate tools, so not aliases here
+    "Remote Support": ["remote support", "remote assistance", "remote desktop support", "teamviewer"],
     "Serverless": ["serverless", "lambda"],
     "Observability": ["observability", "prometheus", "grafana", "datadog", "opentelemetry"],
     "Git": ["git"],
