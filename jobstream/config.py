@@ -100,7 +100,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "mode": "review",
         "max_applications_per_day": 10,
         "max_per_company_per_30_days": 2,
-        "headless": False,
+        "headless": True,             # auto mode runs without a visible window (review always shows one)
         "chromium_path": "",          # leave blank to use Playwright's own browser
     },
     "dashboard": {

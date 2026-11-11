@@ -140,7 +140,7 @@ def test_dashboard_server_needs_the_token():
     import urllib.error
     import urllib.request
 
-    server = dashboard.serve(lambda: "<p>hello</p>", port=0, lan=False, token="secret123", announce=lambda *_: None)
+    server = dashboard.serve(lambda live=None: "<p>hello</p>", port=0, lan=False, token="secret123", announce=lambda *_: None)
     port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
@@ -150,5 +150,66 @@ def test_dashboard_server_needs_the_token():
             assert False, "should be 404 without the token"
         except urllib.error.HTTPError as e:
             assert e.code == 404
+    finally:
+        server.shutdown()
+
+
+def test_dashboard_buttons_api(tmp_path, monkeypatch, profile, cv, settings):
+    import json as _json
+    import threading
+    import time
+    import types
+    import urllib.error
+    import urllib.request
+
+    from jobstream import actions, apply as apply_mod
+    from jobstream.config import Context
+    from jobstream.db import DB
+    from jobstream.models import Job
+
+    dbp = tmp_path / "d.db"
+    db = DB(dbp)
+    for i in (1, 2):
+        db.upsert_job(Job(source="t", source_id=str(i), company=f"Acme {i}", title="IT Support Analyst", location="Leeds",
+                          description="x"), "Acme Ltd")
+    db.conn.execute("UPDATE jobs SET status='shortlisted'")
+    db.commit()
+
+    def fake_apply(db, ctx, llm, uid, mode=None, force=False):
+        db.set_status(uid, "packed")
+        return types.SimpleNamespace(messages=[f"mode={mode}"], submitted=mode == "auto")
+
+    monkeypatch.setattr(apply_mod, "prepare_and_apply", fake_apply)
+    runner = actions.Runner(db_path=dbp, context_loader=lambda: Context(profile, cv, settings), llm_factory=lambda ctx: None)
+    pages = []
+    server = dashboard.serve(lambda live: pages.append(live) or "<p>page</p>", port=0, runner=runner, announce=lambda *_: None)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{port}"
+    try:
+        urllib.request.urlopen(base + "/").read()
+        csrf = pages[-1]["csrf"]
+        assert pages[-1]["local"] is True
+
+        def post(action, uid, token=csrf, ctype="application/json"):
+            req = urllib.request.Request(f"{base}/api/{action}", data=_json.dumps({"uid": uid}).encode(), method="POST",
+                                         headers={"Content-Type": ctype, "X-JobStream": token})
+            try:
+                return _json.loads(urllib.request.urlopen(req).read())
+            except urllib.error.HTTPError as e:
+                return {"code": e.code}
+
+        assert post("skip", "t:1", token="wrong") == {"code": 403}                 # another site can't press buttons
+        assert post("skip", "t:1", ctype="text/plain") == {"code": 403}
+        assert post("skip", "t:1")["ok"] and DB(dbp).get_job("t:1")["status"] == "skipped"
+        task = post("apply", "t:2")["task"]
+        for _ in range(50):
+            req = urllib.request.Request(f"{base}/api/tasks", headers={"X-JobStream": csrf})
+            tasks = {t["id"]: t for t in _json.loads(urllib.request.urlopen(req).read())["tasks"]}
+            if tasks[task["id"]]["state"] in ("done", "failed"):
+                break
+            time.sleep(0.1)
+        assert tasks[task["id"]]["state"] == "done" and tasks[task["id"]]["result"] == "Applied"
+        assert "mode=auto" in tasks[task["id"]]["messages"]
     finally:
         server.shutdown()

@@ -71,7 +71,7 @@ with no spaces or quotes, for example `ANTHROPIC_API_KEY=sk-ant-...`. Save and c
 - [ ] `jobstream visa`: which visa routes are open to you (HPI, Scale-up, new-entrant rate), checked on gov.uk
 - [ ] `jobstream discover`: finds more sponsor job boards (takes a few minutes)
 - [ ] `jobstream run --mode pack`: first full run (about 10 minutes the first time, 1-2 minutes after)
-- [ ] `jobstream dashboard --open`: everything on one page
+- [ ] `jobstream dashboard`: everything on one page, with Apply / Pack / Skip buttons
 - [ ] `jobstream list`, then `jobstream show <id>` on the top few
 - [ ] `jobstream apply <id> --mode dry` once, to see a filled form without submitting
 - [ ] `jobstream apply --top 3`: check each form, press Submit yourself
@@ -87,14 +87,15 @@ with no spaces or quotes, for example `ANTHROPIC_API_KEY=sk-ant-...`. Save and c
 ## 7. Put it on a timetable
 
 - [ ] `jobstream schedule`: shows the timetable (07:10 full run, three quick checks a day, Monday discovery)
-- [ ] `jobstream schedule --install`: sets it up in Windows Task Scheduler (or cron on Mac/Linux).
-      Your PC must be on and awake at those times.
+- [ ] `jobstream schedule --install --mode auto`: sets it up in Windows Task Scheduler (or cron on
+      Mac/Linux), and the morning run applies to the best matches by itself. Use `--mode pack` instead
+      to only build packs. Your PC must be on and awake at those times.
 
 ## 8. Weekly habits
 
 - [ ] Daily, 2 min: read the push and digest, or open the dashboard
       (`jobstream dashboard --lan` shows it on your phone over home Wi-Fi)
-- [ ] Daily, 15 min: `jobstream apply --top 5`, check and submit
+- [ ] Daily, 10 min: open `jobstream dashboard`, clear the **Needs you** list (Open form, finish, Mark applied)
 - [ ] Daily, 10 min: send the networking messages; `jobstream followups`
 - [ ] Weekly: `jobstream speculative`, then `--build 3`, send them, `--sent "<company>"`
 - [ ] Weekly: `jobstream learn` (what's working) and `jobstream radar` (newly licensed sponsors)

@@ -167,7 +167,7 @@ code{font-family:var(--mono);font-size:.9em;background:var(--grey-bg);border-rad
 .search input::placeholder{color:var(--text-3)}
 .tw{overflow-x:auto}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
-col.w-sp{width:150px}col.w-sal{width:118px}col.w-post{width:88px}col.w-score{width:84px}col.w-st{width:112px}col.w-cmd{width:244px}
+col.w-sp{width:150px}col.w-sal{width:118px}col.w-post{width:88px}col.w-score{width:84px}col.w-st{width:112px}col.w-cmd{width:290px}
 col.w-when{width:120px}col.w-next{width:230px}
 th{font-size:12px;font-weight:500;color:var(--text-3);text-align:left;padding:10px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);white-space:nowrap}
 th:first-child{border-top-left-radius:12px}th:last-child{border-top-right-radius:12px}
@@ -189,6 +189,7 @@ tbody tr:hover td{background:var(--surface-2)}
 .muted{color:var(--text-3)}.nowrap{white-space:nowrap}
 .more{display:block;width:100%;border:0;border-top:1px solid var(--border);background:none;padding:12px 16px;text-align:center;font-weight:500;color:var(--text-2);cursor:pointer;border-radius:0 0 12px 12px}
 .more:hover{background:var(--surface-2);color:var(--text)}
+.more[hidden]{display:none}
 .only-m{display:none}
 @media (max-width:1180px){.hide-m{display:none}.only-m{display:inline-flex;vertical-align:1px;margin-left:2px}col.w-post,col.w-st,col.w-next{width:0;visibility:collapse}}
 @media (max-width:760px){
@@ -209,6 +210,36 @@ tbody tr:hover td{background:var(--surface-2)}
 .kv a{text-decoration:none;font-weight:500}.kv a:hover{text-decoration:underline;text-underline-offset:3px}
 .big{font-size:28px;font-weight:600;letter-spacing:-.025em;line-height:1.15;font-variant-numeric:tabular-nums}
 .foot{font-size:12px;color:var(--text-3)}
+/* ---------- action buttons (live dashboard) */
+.acts{display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:100%}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;padding:0 11px;border-radius:8px;border:1px solid var(--border-strong);
+  background:var(--surface);color:var(--text);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;box-shadow:0 1px 2px rgba(16,24,40,.05);text-decoration:none}
+.btn:hover{background:var(--hover)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+.btn.primary:hover{opacity:.88;background:var(--ink)}
+.btn.quiet{border-color:transparent;box-shadow:none;color:var(--text-2)}
+.btn.quiet:hover{color:var(--text);background:var(--hover)}
+.btn[disabled]{opacity:.55;cursor:progress}
+.btn .spin{width:12px;height:12px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.btn .spin{animation:none}}
+@media (max-width:760px){.acts{justify-content:flex-start}}
+.needs>li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;padding:12px 16px;border-top:1px solid var(--border)}
+.needs .t{display:grid;gap:3px;min-width:0}
+.needs b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.needs .why{grid-column:1/-1;color:var(--amber);font-size:13px;margin-top:-2px}
+.needs .m{color:var(--text-2);font-size:13px}
+@media (max-width:620px){.needs>li{grid-template-columns:minmax(0,1fr)}.needs .acts{justify-content:flex-start}}
+.toasts{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));display:grid;gap:8px;z-index:50;
+  width:min(380px,calc(100vw - 32px))}
+.toast{background:var(--surface);border:1px solid var(--border-strong);border-radius:12px;box-shadow:0 8px 24px rgba(16,24,40,.12);padding:12px 14px;
+  display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:start;font-size:13px}
+.toast .ic{margin-top:3px}.toast b{font-weight:600}.toast p{color:var(--text-2);grid-column:2}
+.toast .ic.spin{width:12px;height:12px;border-radius:50%;border:2px solid var(--text-3);border-right-color:transparent;animation:spin .8s linear infinite}
+.toast .ic.ok{width:8px;height:8px;border-radius:50%;background:var(--green);margin:5px 2px 0}
+.toast .ic.warn{width:8px;height:8px;border-radius:50%;background:var(--amber);margin:5px 2px 0}
+.toast .ic.bad{width:8px;height:8px;border-radius:50%;background:var(--red);margin:5px 2px 0}
+.livepill{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3)}
 """
 
 JS = r"""
@@ -222,6 +253,67 @@ const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','
 const day = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? (+m[3]) + ' ' + MON[+m[2]-1] : ''; };
 const money = j => (j.salary_min || j.salary_max) ? '£' + Math.round((j.salary_min || j.salary_max)/1000) + 'k – £' + Math.round((j.salary_max || j.salary_min)/1000) + 'k' : '';
 const short = uid => { const id = String(uid).split(':').pop(); return id.length > 12 ? id.slice(0, 8) : id; };
+
+// ---------- live actions (only when the dashboard is served by `jobstream dashboard`)
+const LIVE = D.live;
+const tracked = new Map();
+let polling = null;
+function toastBox(){ let b = $('#toasts'); if (!b) { b = el('div', 'toasts'); b.id = 'toasts'; b.setAttribute('role', 'status'); b.setAttribute('aria-live', 'polite'); document.body.append(b); } return b; }
+function toast(title, detail, kind, id){
+  const box = toastBox(); let t = id != null ? box.querySelector('[data-id="' + id + '"]') : null;
+  if (!t) { t = el('div', 'toast'); if (id != null) t.dataset.id = id; box.append(t); }
+  t.textContent = ''; t.append(el('i', 'ic ' + kind), el('b', null, title)); if (detail) t.append(el('p', null, detail));
+  if (kind !== 'spin') setTimeout(() => t.remove(), kind === 'ok' ? 5000 : 12000);
+}
+async function call(action, uid, value){
+  const r = await fetch(LIVE.api + '/' + action, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-JobStream': LIVE.csrf},
+                                                  body: JSON.stringify({uid, value: value || ''})});
+  let data = {}; try { data = await r.json(); } catch (e) {}
+  if (!r.ok || !data.ok) throw new Error(data.error || ('Error ' + r.status));
+  return data;
+}
+const VERB = {apply: 'Applying', pack: 'Building the pack', interview: 'Building interview prep'};
+function track(task){ tracked.set(task.id, task); toast(VERB[task.action] + '…', task.label, 'spin', task.id); if (!polling) polling = setInterval(poll, 2500); }
+async function poll(){
+  let data; try { const r = await fetch(LIVE.api + '/tasks', {headers: {'X-JobStream': LIVE.csrf}}); data = await r.json(); } catch (e) { return; }
+  let finished = 0;
+  (data.tasks || []).forEach(t => {
+    if (!tracked.has(t.id) && (t.state === 'queued' || t.state === 'running')) { track(t); return; }
+    if (!tracked.has(t.id) || t.state === 'queued' || t.state === 'running') return;
+    tracked.delete(t.id); finished++;
+    const good = t.state === 'done' && !/^Not sent/.test(t.result);
+    toast(t.state === 'failed' ? 'Something went wrong' : t.result, t.label + (t.state === 'failed' ? ': ' + t.result : ''), t.state === 'failed' ? 'bad' : good ? 'ok' : 'warn', t.id);
+  });
+  if (!tracked.size) { if (polling) clearInterval(polling); polling = null; if (finished) setTimeout(() => location.reload(), 2500); }
+}
+function act(label, cls, fn, title){
+  const b = el('button', 'btn' + (cls ? ' ' + cls : ''), label); b.type = 'button'; if (title) b.title = title;
+  b.addEventListener('click', async () => { b.disabled = true; const keep = b.textContent; b.textContent = ''; b.append(el('i', 'spin'), document.createTextNode(keep));
+    try { await fn(); } catch (e) { toast("Couldn't do that", e.message, 'bad'); } finally { b.disabled = false; b.textContent = keep; } });
+  return b;
+}
+function linkBtn(label, url, cls){ const u = safeUrl(url); if (!u) return null; const a = el('a', 'btn' + (cls ? ' ' + cls : ''), label); a.href = u; a.target = '_blank'; a.rel = 'noopener'; return a; }
+async function quick(action, uid, value, reload){ const d = await call(action, uid, value); if (d.task) { track(d.task); return; }
+  toast(d.message || 'Done', null, 'ok'); if (reload !== false) setTimeout(() => location.reload(), 900); }
+function applyNow(j, force){ return () => { if (!confirm('Apply to ' + j.title + ' at ' + j.company + ' now?\n\nJobStream tailors your CV and cover letter, fills in the form and sends it. ' +
+                                                  'It stops without sending if the site needs a login, has a CAPTCHA, or asks something it can\'t answer truthfully.')) return Promise.resolve();
+                                     return quick('apply', j.uid, force ? 'force' : ''); }; }
+function jobButtons(j){
+  const w = el('div', 'acts');
+  w.append(act('Apply', 'primary', applyNow(j), 'Fill in and send the application'));
+  if (j.status === 'packed' && LIVE.local) w.append(act('Open pack', '', () => quick('open_pack', j.uid, '', false), 'Open the folder with the CV and cover letter'));
+  else if (j.status !== 'packed') w.append(act('Pack', '', () => quick('pack', j.uid), 'Build the CV, cover letter and answers without sending'));
+  w.append(act('Skip', 'quiet', () => confirm('Skip ' + j.title + ' at ' + j.company + '? It leaves your shortlist.') ? quick('skip', j.uid) : null));
+  return w;
+}
+function appButtons(j){
+  const w = el('div', 'acts');
+  if (j.status === 'applied') { w.append(act('Interview', '', () => quick('status', j.uid, 'interview'), 'Got an interview: builds your prep pack'),
+                                         act('Rejected', 'quiet', () => quick('status', j.uid, 'rejected'))); }
+  else if (j.status === 'interview') { w.append(act('Offer', '', () => quick('status', j.uid, 'offer')), act('Rejected', 'quiet', () => quick('status', j.uid, 'rejected'))); }
+  if (LIVE.local) w.append(act('Pack', 'quiet', () => quick('open_pack', j.uid, '', false), 'Open the application pack'));
+  return w;
+}
 const NS = 'http://www.w3.org/2000/svg';
 function icon(paths){ const s = document.createElementNS(NS, 'svg'); s.setAttribute('viewBox', '0 0 16 16'); s.setAttribute('aria-hidden', 'true');
   paths.forEach(d => { const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); s.append(p); }); return s; }
@@ -285,7 +377,9 @@ const T = $('#todo'), KIND = {apply: ['Apply', 'blue'], follow: ['Follow up', 'a
 $('#todo-ct').textContent = D.todo.length ? D.todo.length + ' to do' : '';
 if (!D.todo.length) T.replaceWith(el('p', 'empty', 'Nothing urgent. Run “jobstream watch” to check for fresh jobs.'));
 D.todo.forEach(t => { const li = el('li'), w = el('div', 't'), k = KIND[t.kind] || [t.kind, 'grey'];
-  const p = el('p'); p.append(link(t.text.replace(/^(Apply today|Follow up|Interview): /, ''), t.url)); w.append(badge(k[0], k[1]), p); li.append(w, cmd(t.cmd)); T.append(li); });
+  const p = el('p'); p.append(link(t.text.replace(/^(Apply today|Follow up|Interview): /, ''), t.url)); w.append(badge(k[0], k[1]), p);
+  const job = LIVE && t.uid ? D.shortlist.find(j => j.uid === t.uid) : null;
+  li.append(w, job ? act('Apply', 'primary', applyNow(job)) : LIVE && t.kind === 'apply' && !t.uid ? el('span', 'muted', 'Use Apply on the Shortlist') : cmd(t.cmd)); T.append(li); });
 
 const reach = [['Found', D.found], ['Shortlisted', n('shortlisted') + n('packed') + sent], ['Applied', sent], ['Interview', n('interview') + n('offer')], ['Offer', n('offer')]];
 reach.forEach(([label, v], i) => { const row = el('div', 'frow'), prev = i ? reach[i - 1][1] : 0, rate = i && prev ? v / prev : (i ? 0 : 1);
@@ -331,7 +425,7 @@ function drawJobs(){
     box.append(el('b', null, String(scv)), tk); box.title = (j.fit != null ? 'Claude fit ' : 'Keyword score ') + scv + ' out of 100'; sc.append(box);
     const st = el('td', 'hide-m'); st.append(j.status === 'packed' ? badge('Pack ready', 'blue') : badge('Shortlisted', 'grey'));
     if (j.status === 'packed') { const b2 = badge('Pack ready', 'blue'); b2.classList.add('only-m'); role.querySelector('div').append(document.createTextNode(' '), b2); }
-    const act = el('td', 'r full'); act.append(cmd('jobstream apply ' + short(j.uid)));
+    const act = el('td', 'r full'); act.append(LIVE ? jobButtons(j) : cmd('jobstream apply ' + short(j.uid)));
     tr.append(role, sp, sal, posted, sc, st, act); body.append(tr); });
   const more = $('#sl-more'); more.hidden = rows.length <= limit; more.textContent = 'Show ' + Math.min(20, rows.length - limit) + ' more';
 }
@@ -353,7 +447,7 @@ function drawApps(){
     const s = STATUS[j.status] || [j.status, 'grey'], st = el('td'); st.append(badge(s[0], s[1]));
     const next = el('td', 'hide-m', j.status === 'interview' ? 'Read your prep pack' : j.status === 'offer' ? 'Confirm sponsorship route and salary' : j.status === 'applied' ? (j.applied_days >= 4 ? 'Send a follow-up' : 'Wait, and send the networking messages') : '–');
     if (next.textContent === '–') next.classList.add('muted');
-    const act = el('td', 'r full'); act.append(cmd(j.status === 'interview' ? 'jobstream prep ' + short(j.uid) : 'jobstream show ' + short(j.uid)));
+    const act = el('td', 'r full'); act.append(LIVE ? appButtons(j) : cmd(j.status === 'interview' ? 'jobstream prep ' + short(j.uid) : 'jobstream show ' + short(j.uid)));
     tr.append(role, when, st, next, act); body.append(tr); });
 }
 drawApps();
@@ -385,7 +479,25 @@ D.routes.forEach(r => { const d = el('div'), st = RS[r.status] || [r.status, 'gr
  ['Newly licensed in the last 14 days', num(D.radar.count)], ['Company job boards searched', num(D.radar.boards)]]
  .forEach(([k, v]) => { const d = el('div'); d.append(el('span', null, k), el('span', 'rt', v)); $('#facts').append(d); });
 if (D.radar.names.length) { const d = el('div'); d.append(el('span', 'd', 'New sponsors: ' + D.radar.names.join(', '))); $('#facts').append(d); }
-$('#foot').textContent = 'Read-only. Generated ' + D.generated + '. Nothing on this page can submit or change an application.';
+$('#foot').textContent = LIVE ? 'Live. Updated ' + D.generated + '. Buttons work while `jobstream dashboard` is running on your computer.'
+                               : 'Read-only. Generated ' + D.generated + '. Run `jobstream dashboard` for the version with buttons.';
+
+// ---------- needs you: applications that stopped before sending
+{ const NL = $('#needs'), needs = D.needs || [];
+  $('#needs-card').hidden = !needs.length;
+  needs.forEach(j => { const li = el('li'), t = el('div', 't'), a = j.attempt || {};
+    t.append(el('b', null, j.title), el('span', 'm', j.company));
+    const why = el('p', 'why', a.why ? a.why.charAt(0).toUpperCase() + a.why.slice(1) + (a.detail ? ': ' + a.detail : '') : '');
+    if (LIVE) { const w = el('div', 'acts'), form = linkBtn('Open form', a.url || j.apply_url, 'primary');
+      if (form) w.append(form);
+      w.append(act('Mark applied', '', () => quick('applied', j.uid), 'You sent it yourself'));
+      if (a.blocked !== 'agency' && a.blocked !== 'not_sponsor') w.append(act('Try again', 'quiet', applyNow(j)));
+      else w.append(act('Apply anyway', 'quiet', applyNow(j, true), 'Send it although sponsorship is unconfirmed'));
+      w.append(act('Dismiss', 'quiet', () => quick('dismiss', j.uid)));
+      li.append(t, w, why);
+    } else li.append(t, cmd('jobstream mark-applied ' + short(j.uid)), why);
+    NL.append(li); }); }
+if (LIVE) { $('#sl-act-h').textContent = 'Actions'; $('#ap-act-h').textContent = 'Actions'; poll(); }
 show();
 """
 
@@ -403,6 +515,7 @@ BODY = """
       <dl class="card metrics" id="metrics"></dl>
       <div class="cols">
         <div class="stack">
+          <section class="card" id="needs-card" hidden><div class="ch"><h2>Needs you</h2><span>applications JobStream couldn't send by itself</span></div><ul class="needs" id="needs"></ul></section>
           <section class="card"><div class="ch"><h2>Today</h2><span id="todo-ct"></span></div><ul class="list" id="todo"></ul></section>
           <section class="card"><div class="ch"><h2>Notes from your agent</h2></div><ul class="notes" id="notes"></ul></section>
         </div>
@@ -422,7 +535,7 @@ BODY = """
         <colgroup><col><col class="w-sp"><col class="w-sal"><col class="w-post"><col class="w-score"><col class="w-st"><col class="w-cmd"></colgroup><thead><tr>
         <th>Role</th><th>Sponsor</th>
         <th data-sort="salary"><button type="button">Salary <i></i></button></th><th class="hide-m" data-sort="posted"><button type="button">Posted <i></i></button></th>
-        <th class="r" data-sort="score"><button type="button">Score <i></i></button></th><th class="hide-m">Status</th><th class="r">Apply</th></tr></thead>
+        <th class="r" data-sort="score"><button type="button">Score <i></i></button></th><th class="hide-m">Status</th><th class="r" id="sl-act-h">Apply</th></tr></thead>
         <tbody id="sl-body"></tbody></table></div>
         <p class="empty" id="sl-empty" hidden style="padding-top:16px"></p><button class="more" id="sl-more" type="button" hidden></button></div>
     </section>
@@ -432,7 +545,7 @@ BODY = """
       <div class="tools"><div class="seg" id="ap-seg" role="group" aria-label="Status"></div></div>
       <div class="card"><div class="tw"><table>
         <colgroup><col><col class="w-when"><col class="w-st"><col class="w-next"><col class="w-cmd"></colgroup>
-        <thead><tr><th>Role</th><th>Applied</th><th>Status</th><th class="hide-m">Next step</th><th class="r">Command</th></tr></thead>
+        <thead><tr><th>Role</th><th>Applied</th><th>Status</th><th class="hide-m">Next step</th><th class="r" id="ap-act-h">Command</th></tr></thead>
         <tbody id="ap-body"></tbody></table></div><p class="empty" id="ap-empty" hidden style="padding-top:16px"></p></div>
     </section>
 

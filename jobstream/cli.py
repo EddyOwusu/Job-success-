@@ -357,24 +357,29 @@ def cmd_dashboard(a):
     from . import dashboard
 
     path = dashboard.build(db, ctx)
-    if not (a.serve or a.lan):
+    if a.static:
         print(f"Dashboard written: {path}")
         if a.open:
             import webbrowser
             webbrowser.open(path.as_uri())
-        else:
-            print("Open that file in your browser, or run `jobstream dashboard --open`.\n"
-                  "To read it on your phone: `jobstream dashboard --lan` (same Wi-Fi).")
         return
 
-    def page():
+    from .actions import Runner
+
+    def page(live):
         fresh = DB(DB_PATH)          # each request reads the latest data
         try:
-            return dashboard.render(dashboard.collect(fresh, ctx))
+            data = dashboard.collect(fresh, ctx)
+            data["live"] = live
+            return dashboard.render(data)
         finally:
             fresh.conn.close()
 
-    server = dashboard.serve(page, port=a.port, lan=a.lan)
+    server = dashboard.serve(page, port=a.port, lan=a.lan, runner=Runner())
+    print("The buttons work while this window stays open. Press Ctrl+C to stop.")
+    if not a.no_open:
+        import webbrowser
+        webbrowser.open(server.url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -485,11 +490,15 @@ def cmd_schedule(a):
         print(schedule.remove())
         return
     if a.install:
-        print(schedule.install(log))
+        print(schedule.install(log, a.mode))
+        if a.mode == "auto":
+            print("Each morning JobStream applies to the best new matches by itself (at most "
+                  f"{_ctx_db()[0].settings['apply']['max_applications_per_day']} a day). Anything it can't finish "
+                  "goes on the dashboard's Needs you list.")
         return
-    kind, lines = schedule.plan(log)
+    kind, lines = schedule.plan(log, a.mode)
     print("The timetable (your computer must be on at these times):\n")
-    for name, (freq, at), args, why in schedule.TASKS:
+    for name, (freq, at), args, why in schedule.tasks(a.mode):
         print(f"  {at}  {'Mondays' if freq == 'WEEKLY' else 'daily  '}  jobstream {args:<16} {why}")
     print("\nRun `jobstream schedule --install` to set it up, or do it yourself with:\n")
     if kind == "cron":
@@ -694,10 +703,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--interviewers", help="names and roles, if you know them")
     s.add_argument("--notes", help="anything they told you about the interview")
     s.set_defaults(fn=cmd_prep)
-    s = sub.add_parser("dashboard", help="one page with today's actions, shortlist, pipeline, results and source health")
-    s.add_argument("--open", action="store_true", help="open it in your browser")
-    s.add_argument("--serve", action="store_true", help="serve it live on this computer (refresh to update)")
+    s = sub.add_parser("dashboard", help="your dashboard, with buttons to apply, build packs and update applications")
     s.add_argument("--lan", action="store_true", help="also reachable from your phone on the same Wi-Fi")
+    s.add_argument("--static", action="store_true", help="just write the read-only HTML file (no buttons)")
+    s.add_argument("--open", action="store_true", help="with --static: open the file in your browser")
+    s.add_argument("--no-open", action="store_true", help="don't open the browser")
+    s.add_argument("--serve", action="store_true", help=argparse.SUPPRESS)   # the default now; kept for old habits
     s.add_argument("--port", type=int, default=8765)
     s.set_defaults(fn=cmd_dashboard)
     s = sub.add_parser("grow", help="your skill gaps, and two-week project plans that close them")
@@ -718,6 +729,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("schedule", help="show or install the daily timetable (Windows Task Scheduler or cron)")
     s.add_argument("--install", action="store_true", help="create the scheduled tasks now")
     s.add_argument("--remove", action="store_true", help="remove them")
+    s.add_argument("--mode", choices=["pack", "auto"], default="pack",
+                   help="pack: build application packs for you to send | auto: apply to the best matches by itself")
     s.set_defaults(fn=cmd_schedule)
     sub.add_parser("visa", help="which visa routes are open to you (Skilled Worker, Scale-up, HPI...), checked on gov.uk").set_defaults(fn=cmd_visa)
     s = sub.add_parser("radar", help="newly licensed visa sponsors, and their job boards")

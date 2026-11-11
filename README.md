@@ -125,7 +125,7 @@ leave your machine, apart from the job and CV text sent to the Claude API.
 | `jobstream list --scaleup` | Open jobs at Scale-up sponsors |
 | `jobstream list --assessed` | Every job Claude has read, with its verdict and the main reason it isn't higher |
 | `jobstream assess --again` | Claude re-reads jobs it assessed under older rules (`--all`: every one, e.g. after you change your profile) |
-| `jobstream dashboard --open` | The dashboard in your browser (`--lan` to read it on your phone) |
+| `jobstream dashboard` | The dashboard with buttons: Apply, Pack, Skip, Mark applied (`--lan` for your phone) |
 | `jobstream grow` | Your skill gaps; `--plan` writes a two-week project plan for the top one |
 | `jobstream health` | Is every job source still working? |
 | `jobstream learn` | What's working: interview rates by sector, source, score, advert age, networking |
@@ -157,30 +157,42 @@ jobstream schedule --remove
 
 | Time | What runs |
 |---|---|
-| 07:10 daily | `jobstream run --mode pack`: full search, assessment, packs, inbox, radar, digest |
+| 07:10 daily | `jobstream run --mode pack` (or `--mode auto` if installed with `schedule --install --mode auto`): full search, assessment, packs or applications, inbox, radar, digest |
 | 11:30, 15:30, 19:30 daily | `jobstream watch`: quick check, "Apply today" alerts |
 | 06:40 Mondays | `jobstream discover`: more sponsor job boards |
 
 Your computer must be on and awake at those times.
 
-Then each evening run `jobstream apply --top 5` (review mode), check each form and
-press Submit. That takes about 15 minutes a day for 5 strong, tailored applications.
+Then each evening open the dashboard and press **Apply** on the best few (or run
+`jobstream apply --top 5`). To have the morning run apply by itself, install the timetable
+with `jobstream schedule --install --mode auto`.
 
 ## Apply modes
 
 Set `apply.mode` in `config/settings.yaml`, or pass `--mode`:
 
 - **`pack`**: build the files only. You apply yourself.
-- **`review`** (default): the browser opens with everything filled in. You check it,
+- **`review`**: the browser opens with everything filled in. You check it,
   press Submit, then type `y` so it's tracked.
-- **`auto`**: submits by itself, but only when every required field has a
-  confident answer and there is no CAPTCHA. Otherwise it falls back to review.
-  It is limited by `max_applications_per_day` (10) and
-  `max_per_company_per_30_days` (2), because spraying one company looks bad to
-  its recruiters.
+- **`auto`**: JobStream applies by itself. From the advert link (Adzuna, Reed, a careers
+  page) it finds the application form: it clicks "Apply now", follows new tabs, closes
+  cookie banners (choosing "reject" or "necessary only" where offered), fills every field,
+  uploads the tailored CV and cover letter, steps through multi-page forms and presses
+  Submit. It checks for a confirmation page and keeps screenshots in the pack
+  (`form-filled.png`, `after-submit.png`).
 
-Recommendation: stay on `review` for the first 20 or so applications, read what
-the agent writes, improve your master CV, then decide about `auto`.
+  It **stops without sending**, and puts the job on the dashboard's **Needs you** list with the
+  reason, when:
+  - the site needs a login or a new account (Workday, NHS Jobs, many big employers):
+    JobStream never creates accounts or signs in for you;
+  - there is a CAPTCHA (it never solves them);
+  - a required question has no truthful answer in your profile, or an answer is uncertain;
+  - the advert is from a recruitment agency, or the employer isn't confirmed on the sponsor
+    register (use **Apply anyway** if you're sure).
+
+  It is limited by `max_applications_per_day` (10) and `max_per_company_per_30_days` (2),
+  because spraying one company looks bad to its recruiters. Scheduled runs use a hidden
+  browser; a click on the dashboard shows the browser so you can watch.
 
 ## How it decides what's worth your time
 
@@ -292,10 +304,19 @@ salary or date), **Applications** (status, date and next step for each), **Insig
 (interview rates, skill gaps, what was filtered out) and **System** (source health, visa
 routes, sponsorship facts). On a phone the sidebar becomes scrolling tabs and tables become
 cards. Set the product name with `dashboard.title` in `config/settings.yaml`.
-`--open` opens it; `--serve`
-serves a live copy at `http://127.0.0.1:8765`; `--lan` also makes it reachable from your
-phone on the same Wi-Fi, behind a random address printed when it starts. The page is
-read-only: nothing on it can change or submit anything.
+`jobstream dashboard` serves it live at `http://127.0.0.1:8765` and opens it, with **buttons**
+that work while that window stays open:
+
+- Shortlist: **Apply** (tailor, fill in and send), **Pack** (build the files only),
+  **Open pack** (the folder with the CV and letter), **Skip**.
+- Overview, **Needs you**: applications that stopped before sending, with the reason.
+  **Open form** to finish it yourself, then **Mark applied**; **Try again**; **Dismiss**.
+- Applications: **Interview** (builds your prep pack), **Offer**, **Rejected**.
+
+Slow actions run one at a time in the background with a progress message. `--lan` also
+makes it reachable from your phone on the same Wi-Fi, behind a random address printed when
+it starts. Every button press must carry a secret the page was given, so other websites
+can't press them. `--static` writes the read-only file without starting the server.
 
 **Skill projects (`jobstream grow`).** For each skill missing from your profile it shows
 the share of your near-match jobs that ask for it, how often it's a hard requirement, which
@@ -412,7 +433,8 @@ jobstream/
   alerts.py         "apply today" pushes; schedule.py sets up Task Scheduler / cron
   visa_routes.py    HPI, Scale-up, new-entrant and other routes, checked on gov.uk
   growth.py         skill gaps and two-week project plans
-  dashboard.py      the one-page dashboard and its read-only server
+  dashboard.py      the dashboard and its local server (buttons call actions.py)
+  actions.py        what the dashboard buttons do; slow ones run on a background queue
   health.py         per-source run history and breakage detection
 config/             example profile and master CV (copy them with `jobstream init`)
 data/seed_companies.yaml   starting list of employers' job boards

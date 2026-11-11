@@ -16,6 +16,33 @@ from ..tailor import answer_questions, cover_letter, needs_statement, supporting
 from .pack import Pack, write_answers, write_pack
 
 
+BLOCKED = {
+    "login": "the site needs you to sign in or create an account",
+    "captcha": "the form has a CAPTCHA",
+    "unanswered": "a required question needs your answer",
+    "unsure": "an answer needs checking before it's sent",
+    "no_form": "couldn't find the application form from the advert link",
+    "no_confirmation": "pressed Submit but saw no confirmation: check your email",
+    "agency": "agency advert: confirm the employer can sponsor before applying",
+    "not_sponsor": "employer not confirmed on the sponsor register",
+    "error": "the browser hit an error",
+}
+
+
+def record_attempt(db: DB, uid: str, blocked: str, url: str = "", detail: str = "") -> None:
+    """Remember why an automatic application stopped, for the dashboard's "Needs you" list."""
+    row = db.get_job(uid)
+    if not row:
+        return
+    extra = json.loads(row["extra"] or "{}")
+    if blocked:
+        extra["apply_attempt"] = {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "blocked": blocked,
+                                  "why": BLOCKED.get(blocked, blocked), "url": url, "detail": detail[:300]}
+    else:
+        extra.pop("apply_attempt", None)
+    db.conn.execute("UPDATE jobs SET extra=? WHERE uid=?", (json.dumps(extra), row["uid"]))
+
+
 @dataclass
 class ApplyOutcome:
     pack: Pack
@@ -129,10 +156,19 @@ def prepare_and_apply(db: DB, ctx: Context, llm: Optional[LLM], uid: str, mode: 
     pack = write_pack(OUTPUT_DIR, job, ctx.profile.personal, cv, letter, score, assessment, report, warnings,
                       answers, net_md, statement)
     db.set_status(job.uid, "packed")
+    fresh_extra = json.loads((db.get_job(job.uid) or {"extra": "{}"})["extra"] or "{}")
+    db.conn.execute("UPDATE jobs SET extra=? WHERE uid=?", (json.dumps({**fresh_extra, "pack_dir": str(pack.dir)}), job.uid))
     msgs.append(f"Application pack: {pack.dir}")
 
     submitted = False
     method = "pack"
+    if mode == "auto":
+        from ..agencies import is_agency
+        why = "agency" if is_agency(job.company, job.extra) else "" if sponsor else "not_sponsor"
+        if why and not force:
+            record_attempt(db, job.uid, why, job.apply_url or job.url)
+            msgs.append(f"Not sent automatically: {BLOCKED[why]}. The pack is ready.")
+            mode = "pack"
     if mode in ("review", "auto", "dry"):
         from .browser import fill_form
 
@@ -159,14 +195,25 @@ def prepare_and_apply(db: DB, ctx: Context, llm: Optional[LLM], uid: str, mode: 
 
         a = ctx.settings["apply"]
         try:
-            res = fill_form(url, ctx, pack, answer_fn, mode=mode, headless=a["headless"], chromium_path=a["chromium_path"])
+            import sys
+            # scheduled runs have no console: never pop a browser window up on the screen
+            headless = a["headless"] or not (sys.stdin is not None and sys.stdin.isatty())
+            res = fill_form(url, ctx, pack, answer_fn, mode=mode, headless=headless, chromium_path=a["chromium_path"])
             submitted = res.submitted
             method = f"browser-{mode}"
             msgs += res.notes
             if res.unanswered_required:
                 msgs.append("Unanswered required fields: " + "; ".join(q[:60] for q in res.unanswered_required))
+            if mode == "auto":
+                detail = "; ".join((res.unanswered_required or res.low_confidence)[:3])
+                record_attempt(db, job.uid, "" if submitted else (res.blocked or "no_confirmation"),
+                               res.final_url or url, detail)
+                if not submitted:
+                    msgs.append(f"Not sent: {BLOCKED.get(res.blocked, res.blocked)}. It's on your Needs you list.")
         except Exception as e:
             msgs.append(f"Browser filling failed ({e}). Apply by hand with the pack: {url}")
+            if mode == "auto":
+                record_attempt(db, job.uid, "error", url, str(e))
 
     if submitted:
         from ..learn import snapshot
