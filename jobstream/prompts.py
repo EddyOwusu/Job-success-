@@ -128,6 +128,9 @@ COVER_TASK = """Write a cover letter for this job, at most {max_words} words.
   dossier that map to the advert's top requirements; (4) a confident close. Mention the visa only
   if the advert raises it, and then briefly and positively ("I would need Skilled Worker
   sponsorship; I'm a straightforward case: ...") using only true facts.
+- If the candidate's current job is outside the field of this role and one of their stories explains why,
+  add one plain, unapologetic sentence from that story, so a screener doesn't read it as a career change.
+  This may mention the visa, because the story does.
 - sign_off: "Kind regards,\\n{name}"
 Tone: {tone}.
 """
