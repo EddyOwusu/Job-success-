@@ -77,7 +77,11 @@ def test_route_check_not_eligible_cases(profile, settings, tmp_path, monkeypatch
     r = routes_for(profile, settings, tmp_path, monkeypatch)            # graduated 2021: over 5 years ago
     assert r["High Potential Individual (HPI)"].status == "not_eligible"
     r = routes_for(profile, settings, tmp_path, monkeypatch, education__uk_degree=True, education__graduation_year=2025)
-    assert r["High Potential Individual (HPI)"].status == "not_eligible" and "Graduate visa" in r
+    assert r["High Potential Individual (HPI)"].status == "not_eligible"
+    assert r["Graduate visa"].status == "not_eligible"            # studied while on another visa
+    r = routes_for(profile, settings, tmp_path, monkeypatch, education__uk_degree=True, education__graduation_year=2025,
+                   visa__current_status="Student visa, course ends June 2026")
+    assert r["Graduate visa"].status == "likely"
     r = routes_for(profile, settings, tmp_path, monkeypatch, education__institution="University of Ghana",
                    education__graduation_year=2024, education__uk_degree=False)
     assert r["High Potential Individual (HPI)"].status == "unlikely"

@@ -181,6 +181,9 @@ def check(profile: Profile, settings: dict, cache_dir: Path, scaleup_count: int 
     tr = transitional(v)
     on_route = "skilled worker" in status_text
     if tr["lower_salary"]:
+        # the transitional floor is already below the new-entrant rate, so those notes don't apply
+        sw.details = [d for d in sw.details if not d.startswith(("New-entrant rate", "Add visa.date_of_birth"))]
+        sw.next_steps = [n for n in sw.next_steps if "new_entrant" not in n]
         sw.summary = (f"You are already on this route, so moving to a new employer means a new certificate of sponsorship and an "
                       f"application to update your visa. Your salary floor is £{sp.get('transitional_threshold_gbp', 31300):,} "
                       f"(or the job's lower going rate, if higher), not £{sp['general_threshold_gbp']:,}.")
@@ -224,7 +227,7 @@ def check(profile: Profile, settings: dict, cache_dir: Path, scaleup_count: int 
                 link=f"{GOV}/high-potential-individual-visa/eligibility", needs_sponsor=False)
     gy = edu.graduation_year
     if edu.uk_degree:
-        hpi.status, hpi.summary = "not_eligible", "UK universities aren't eligible for HPI (see the Graduate visa instead)."
+        hpi.status, hpi.summary = "not_eligible", "UK universities aren't eligible for HPI."
     elif v.had_graduate_visa:
         hpi.status, hpi.summary = "not_eligible", "You can't apply for HPI if you've already had a Graduate visa."
     elif not edu.institution or not gy:
@@ -272,16 +275,23 @@ def check(profile: Profile, settings: dict, cache_dir: Path, scaleup_count: int 
                 hpi.details.append(f"Couldn't check the lists ({e.__class__.__name__}). Use the link.")
     routes.append(hpi)
 
-    # ---- Graduate
+    # ---- Graduate (only for courses studied on a Student visa)
     if edu.uk_degree:
         on_student = "student" in status_text
-        routes.append(Route(
-            "Graduate visa", "likely" if on_student else "check",
-            "2 years of work rights after a UK degree (3 after a PhD), no sponsor needed. You must apply from inside "
-            "the UK while your Student visa is still valid.",
-            next_steps=["Apply before your Student visa expires.",
-                        "While you hold it, set visa.current_uk_right_to_work: true so employers see you can start now."],
-            link=f"{GOV}/graduate-visa", needs_sponsor=False))
+        if on_student:
+            routes.append(Route(
+                "Graduate visa", "likely",
+                "2 years of work rights after a UK degree (3 after a PhD), no sponsor needed. You must apply from inside "
+                "the UK while your Student visa is still valid.",
+                next_steps=["Apply before your Student visa expires.",
+                            "While you hold it, set visa.current_uk_right_to_work: true so employers see you can start now."],
+                link=f"{GOV}/graduate-visa", needs_sponsor=False))
+        else:
+            routes.append(Route(
+                "Graduate visa", "not_eligible",
+                "Only for people who studied their UK degree on a Student visa. Your profile says you were on another "
+                "visa, so this route doesn't apply.",
+                link=f"{GOV}/graduate-visa/eligibility", needs_sponsor=False))
 
     # ---- nationality-based schemes
     nat = (v.nationality or "").strip()
