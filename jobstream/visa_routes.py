@@ -47,7 +47,7 @@ def _guide(slug: str, cache_dir: Path) -> dict[str, str]:
     """{part slug: plain text} for a gov.uk guide, cached for a week."""
     cache = cache_dir / f"govuk-{slug.replace('/', '_')}.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL:
-        return json.loads(cache.read_text())
+        return json.loads(cache.read_text(encoding="utf-8"))
     data = get_json(f"{GOV}/api/content/{slug}") or {}
     parts = {p["slug"]: BeautifulSoup(p.get("body", ""), "html.parser").get_text(" ", strip=True)
              for p in data.get("details", {}).get("parts", [])}
@@ -56,7 +56,7 @@ def _guide(slug: str, cache_dir: Path) -> dict[str, str]:
     parts["_html_eligibility"] = next((p.get("body", "") for p in data.get("details", {}).get("parts", [])
                                        if p["slug"] == "eligibility"), "")
     cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps(parts))
+    cache.write_text(json.dumps(parts), encoding="utf-8")
     return parts
 
 
@@ -90,7 +90,7 @@ def hpi_lists(cache_dir: Path) -> dict[int, list[tuple[str, str]]]:
     """{list year: [(university, country)]}. List year N covers awards from 1 Nov N to 31 Oct N+1."""
     cache = cache_dir / "govuk-hpi-lists.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL:
-        return {int(k): [tuple(x) for x in v] for k, v in json.loads(cache.read_text()).items()}
+        return {int(k): [tuple(x) for x in v] for k, v in json.loads(cache.read_text(encoding="utf-8")).items()}
     guide = _guide("high-potential-individual-visa", cache_dir)
     soup = BeautifulSoup(guide.get("_html_eligibility", ""), "html.parser")
     lists: dict[int, list[tuple[str, str]]] = {}
@@ -108,7 +108,7 @@ def hpi_lists(cache_dir: Path) -> dict[int, list[tuple[str, str]]]:
         if rows:
             lists[int(m.group(1))] = rows
     if lists:
-        cache.write_text(json.dumps(lists))
+        cache.write_text(json.dumps(lists), encoding="utf-8")
     return lists
 
 

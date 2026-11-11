@@ -46,7 +46,7 @@ def get_json(url: str, *, params: dict | None = None, auth=None, min_interval: f
         key = hashlib.sha1(json.dumps([url, params], sort_keys=True).encode()).hexdigest()
         cache_file = cache_dir / f"{key}.json"
         if cache_file.exists() and time.time() - cache_file.stat().st_mtime < cache_ttl:
-            return json.loads(cache_file.read_text())
+            return json.loads(cache_file.read_text(encoding="utf-8"))
     host = url.split("/")[2]
     _throttle(host, min_interval)
     r = session().get(url, params=params, auth=auth, timeout=timeout)
@@ -56,5 +56,5 @@ def get_json(url: str, *, params: dict | None = None, auth=None, min_interval: f
     data = r.json()
     if cache_file:
         cache_file.parent.mkdir(parents=True, exist_ok=True)
-        cache_file.write_text(json.dumps(data))
+        cache_file.write_text(json.dumps(data), encoding="utf-8")
     return data

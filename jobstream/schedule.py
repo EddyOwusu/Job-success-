@@ -25,12 +25,14 @@ def executable() -> str:
     return f'"{sys.executable}" -m jobstream'
 
 
-def windows_commands() -> list[str]:
+def windows_commands(log: Path | None = None) -> list[str]:
+    """schtasks commands. Paths are quoted because Windows user folders often contain spaces."""
     exe = executable()
+    exe_q = exe.replace('"', '\\"') if exe.startswith('"') else f'\\"{exe}\\"'
+    log_part = f' --log \\"{log}\\"' if log else ""
     out = []
     for name, (freq, at), args, _ in TASKS:
-        tr = f'{exe} {args}' if exe.startswith('"') else f'\\"{exe}\\" {args}'
-        cmd = f'schtasks /Create /F /TN "{name}" /SC {freq} /ST {at} /TR "{tr}"'
+        cmd = f'schtasks /Create /F /TN "{name}" /SC {freq} /ST {at} /TR "{exe_q}{log_part} {args}"'
         if freq == "WEEKLY":
             cmd += " /D MON"
         out.append(cmd)
@@ -49,7 +51,7 @@ def cron_lines(log: Path) -> list[str]:
 
 def plan(log: Path) -> tuple[str, list[str]]:
     if platform.system() == "Windows":
-        return "windows", windows_commands()
+        return "windows", windows_commands(log)
     return "cron", cron_lines(log)
 
 

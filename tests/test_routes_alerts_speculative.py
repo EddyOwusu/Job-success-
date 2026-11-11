@@ -123,6 +123,17 @@ def test_schedule_plans():
     assert len(lines) == 5 and lines[0].startswith("10 7 * * * ") and " 1 " in lines[-1] and "watch" in lines[1]
     cmds = schedule.windows_commands()
     assert all(c.startswith("schtasks /Create") for c in cmds) and cmds[-1].endswith("/D MON")
+    # Windows: user folders with spaces must stay quoted, and runs are logged
+    import pathlib
+    old = schedule.executable
+    schedule.executable = lambda: r"C:\Users\Ama Mensah\JobStream\.venv\Scripts\jobstream.exe"
+    try:
+        c = schedule.windows_commands(pathlib.PureWindowsPath(r"C:\Users\Ama Mensah\JobStream\output\schedule.log"))[0]
+    finally:
+        schedule.executable = old
+    assert c == ('schtasks /Create /F /TN "jobstream-daily" /SC DAILY /ST 07:10 /TR '
+                 '"\\"C:\\Users\\Ama Mensah\\JobStream\\.venv\\Scripts\\jobstream.exe\\" '
+                 '--log \\"C:\\Users\\Ama Mensah\\JobStream\\output\\schedule.log\\" run --mode pack"')
 
 
 # ---------------------------------------------------------------------------- speculative

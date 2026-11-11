@@ -584,6 +584,7 @@ def cmd_run(a):
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="jobstream", description="JobStream: your personal UK tech job-search agent.")
     p.add_argument("-v", "--verbose", action="store_true")
+    p.add_argument("--log", metavar="FILE", help="append everything printed to this file (used by scheduled runs)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("init", help="create your config files").set_defaults(fn=cmd_init)
@@ -686,6 +687,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.log:
+        from datetime import datetime
+        from pathlib import Path
+        Path(args.log).parent.mkdir(parents=True, exist_ok=True)
+        sys.stdout = sys.stderr = open(args.log, "a", encoding="utf-8", buffering=1)
+        print(f"\n=== {datetime.now():%Y-%m-%d %H:%M} jobstream {args.cmd} ===")
+    else:
+        # Windows consoles and pipes may not be UTF-8; never crash on a job title with an emoji in it
+        for stream in (sys.stdout, sys.stderr):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (AttributeError, ValueError):
+                pass
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     try:
         return args.fn(args) or 0

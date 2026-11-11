@@ -268,7 +268,7 @@ def template_prep(ctx: Context, job: Job, stage: str) -> str:
 
 def summary_line(path: Path) -> str:
     try:
-        data = json.loads((path.parent / "interview-prep.json").read_text())
+        data = json.loads((path.parent / "interview-prep.json").read_text(encoding="utf-8"))
         return f"{len(data['questions'])} questions, {len(data['stories'])} stories, {len(data['technical_topics'])} topics"
     except Exception:
         return "template"

@@ -5,24 +5,37 @@ Nothing here contains personal data, so it is safe in the repository.
 
 ## 1. Install (about 10 minutes)
 
-- [ ] Install Python 3.10 or newer (python.org) and Git, if you don't have them
-- [ ] Get the code:
-  ```bash
-  git clone https://github.com/EddyOwusu/Job-success-.git
-  cd Job-success-
+**Windows**
+
+- [ ] Install Python 3.12 or 3.13 from python.org. On the first installer screen, tick
+      **"Add python.exe to PATH"**
+- [ ] Install Git from git-scm.com (accept the defaults)
+- [ ] Open **Command Prompt** (not PowerShell) and get the code:
+  ```bat
+  cd %USERPROFILE%
+  git clone https://github.com/EddyOwusu/Job-success-.git JobStream
+  cd JobStream
   git checkout claude/dreamy-clarke-xemmiq
   ```
-- [ ] Create the environment and install:
-  ```bash
-  python -m venv .venv
-  # Windows:    .venv\Scripts\activate
-  # Mac/Linux:  source .venv/bin/activate
-  pip install -e ".[apply]"
-  playwright install chromium
-  ```
-- [ ] Create your private files: `jobstream init`
+- [ ] Run `setup.bat` (in that window, or double-click it in the JobStream folder). It creates the
+      Python environment, installs everything, downloads the browser and runs `jobstream init`
+- [ ] From now on, double-click **`JobStream.bat`** whenever you want to use it. It opens a command
+      window where the `jobstream` command works
+
+**Mac or Linux**
+
+```bash
+git clone https://github.com/EddyOwusu/Job-success-.git JobStream && cd JobStream
+git checkout claude/dreamy-clarke-xemmiq
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[apply]" && playwright install chromium
+jobstream init
+```
 
 ## 2. Keys (in the `.env` file; never paste keys into a chat)
+
+Open it with `notepad .env` from the JobStream folder. Each key goes after the `=` on its line,
+with no spaces or quotes, for example `ANTHROPIC_API_KEY=sk-ant-...`. Save and close.
 
 - [ ] `ANTHROPIC_API_KEY`: your Claude API key (needed for assessments, tailored CVs, statements, interview prep)
 - [ ] In the Claude Console, check that **web search** is allowed for your organisation

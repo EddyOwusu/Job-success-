@@ -23,7 +23,7 @@ def load_dotenv(path: Path | None = None) -> None:
     path = path or ROOT / ".env"
     if not path.exists():
         return
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -145,7 +145,7 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 
 def _read_yaml(path: Path) -> dict:
-    with path.open(encoding="utf-8") as f:
+    with path.open(encoding="utf-8-sig") as f:      # tolerate a byte-order mark from Notepad
         return yaml.safe_load(f) or {}
 
 
