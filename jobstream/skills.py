@@ -97,8 +97,8 @@ TAXONOMY: dict[str, list[str]] = {
     "GitLab CI": ["gitlab ci"],
     "Linux": ["linux", "unix"],
     "SSH": ["ssh", "secure shell"],
-    # tool names only where they're the same skill; RDP and AnyDesk are separate tools, so not aliases here
-    "Remote Support": ["remote support", "remote assistance", "remote desktop support", "teamviewer"],
+    "Remote Support": ["remote support", "remote assistance", "remote desktop support", "teamviewer", "anydesk",
+                       "remote desktop", "rdp"],
     "Serverless": ["serverless", "lambda"],
     "Observability": ["observability", "prometheus", "grafana", "datadog", "opentelemetry"],
     "Git": ["git"],
@@ -146,6 +146,8 @@ TAXONOMY: dict[str, list[str]] = {
     "Supabase": ["supabase"],
     "Vercel": ["vercel"],
     "Cloudflare": ["cloudflare"],
+    "Web Hosting": ["web hosting", "website hosting", "cpanel", "domain names", "domain management", "domain registration",
+                    "namecheap", "hostgator", "hostinger", "godaddy", "plesk"],
     "WordPress": ["wordpress"],
     "Playwright": ["playwright"],
     # customer-facing technology roles
