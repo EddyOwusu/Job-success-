@@ -34,7 +34,7 @@ def request(ctx: Context, job: Job, sponsor_name: str | None) -> tuple[str, str]
                  "a question to check, not as a gap.")
     from .sponsors import core_name
     here = core_name(job.company)
-    def same_employer(cv_company: str) -> bool:      # "Bupa Care Services, Hadley Lawns" is Bupa
+    def same_employer(cv_company: str) -> bool:      # "Acme Care Services, Riverside House" is Acme
         c = core_name(cv_company.split(",")[0])
         return c == here or c.startswith(here + " ") or here.startswith(c + " ")
 
